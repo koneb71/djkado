@@ -1,5 +1,7 @@
 # DJKado — pro DJ mixing in your browser
 
+[![CI](https://github.com/koneb71/djkado/actions/workflows/ci.yml/badge.svg)](https://github.com/koneb71/djkado/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/koneb71/djkado?include_prereleases)](https://github.com/koneb71/djkado/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-22d3ee.svg)](LICENSE)
+
 A VirtualDJ-style DJ app built with Vite + React 19 + TypeScript, Tailwind v4, Motion (Framer Motion), Zustand and the Web Audio API. Two or four decks, real-time colored waveforms, BPM / key / beat-grid analysis, sync, loops, hot cues, slip, 3-band EQ + filter, an FX rack, sampler, recording, MIDI learn, keyboard shortcuts — with a hybrid engine designed for local files **and** streaming services.
 
 ```bash
@@ -125,3 +127,7 @@ Chrome / Edge give the full experience (AudioWorklet, File System Access, Web MI
 ## Scripts
 
 `pnpm dev` · `pnpm dev:web` · `pnpm dev:api` · `pnpm build` · `pnpm preview` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm dev:desktop` · `pnpm build:desktop` · `pnpm dist:mac` · `pnpm dist:win` · `pnpm dist` · `pnpm release` · `pnpm icons` (regenerate `build/icon.png`) · `node scripts/gen-demo.mjs` (regenerate demo clips) · `node scripts/vendor.mjs` (re-vendor the stretch lib after upgrading it)
+
+## Contributing & license
+
+PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Releases are built by GitHub Actions on `v*` tags. DJKado is open source under the [MIT License](LICENSE). Bundled: [signalsmith-stretch](https://signalsmith-audio.co.uk/code/stretch/) (MIT). DJKado is not affiliated with Spotify, Apple or VirtualDJ; use your own developer credentials and respect each service's terms.

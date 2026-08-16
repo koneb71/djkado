@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "DJKado — a VirtualDJ-style browser DJ app with a hybrid local/streaming engine",
+  "description": "DJKado \u2014 a VirtualDJ-style browser DJ app with a hybrid local/streaming engine",
   "scripts": {
     "dev": "concurrently -k -n web,api -c cyan,magenta \"vite\" \"node server/index.ts\"",
     "dev:web": "vite",
@@ -73,5 +73,6 @@
   "main": "dist-electron/main.js",
   "repository": "github:koneb71/djkado",
   "author": "koneb71",
-  "homepage": "https://github.com/koneb71/djkado"
+  "homepage": "https://github.com/koneb71/djkado",
+  "license": "MIT"
 }
