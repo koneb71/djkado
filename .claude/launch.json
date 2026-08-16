@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "djkado-web", "runtimeExecutable": "pnpm", "runtimeArgs": ["dev:web"], "port": 5173, "url": "http://127.0.0.1:5173" },
+    { "name": "djkado-api", "runtimeExecutable": "node", "runtimeArgs": ["server/index.ts"], "port": 8787 }
+  ]
+}

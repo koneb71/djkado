@@ -1,0 +1,1 @@
+{"root":["./vite.config.ts","./server/app.ts","./server/appletoken.ts","./server/index.ts","./electron/config.ts","./electron/main.ts","./electron/menu.ts","./electron/preload.ts","./electron/updater.ts","./electron/window-state.ts"],"version":"5.9.3"}

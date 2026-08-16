@@ -1,0 +1,9 @@
+allowBuilds:
+  esbuild: true
+  electron: true
+  sharp: true
+  electron-winstaller: true
+onlyBuiltDependencies:
+  - esbuild
+  - electron
+  - sharp

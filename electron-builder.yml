@@ -1,0 +1,49 @@
+appId: com.djkado.app
+productName: DJKado
+copyright: © 2026 DJKado
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - dist-electron/**
+asar: true
+npmRebuild: false
+mac:
+  category: public.app-category.music
+  icon: build/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # notarize: automatically enabled by electron-builder when APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are set
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+dmg:
+  contents:
+    - { x: 130, y: 220 }
+    - { x: 410, y: 220, type: link, path: /Applications }
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  # signing: set CSC_LINK / CSC_KEY_PASSWORD (or azure trusted signing vars) to enable
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  shortcutName: DJKado
+publish:
+  provider: github
+  owner: koneb71
+  repo: djkado
+  releaseType: release
+toolsets:
+  nsis: 1.2.1
+  winCodeSign: 1.1.0
