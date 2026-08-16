@@ -87,7 +87,7 @@ How it works: the packaged app starts the same Hono server as `server/` on **htt
 
 **Streaming in the desktop app:** stock Electron has no Widevine DRM module, so Spotify Web Playback and Apple Music *full-track* playback cannot run inside the desktop app — browsing, Apple 30 s previews (full engine) and local files all work; use the web app in Chrome for DRM streams. Apple credentials for the desktop app go in Settings ▸ Desktop (Team ID, Key ID, choose the `.p8`) — no `.env` needed. For Spotify, register **both** redirect URIs (`http://127.0.0.1:5173/callback/spotify` and `http://127.0.0.1:47831/callback/spotify`) in the Spotify dashboard.
 
-Building on Apple Silicon: the Windows installer is produced with electron-builder's native NSIS toolset (`toolsets.nsis: 1.2.1`); no Rosetta or Wine needed.
+Building on Apple Silicon: the Windows installer is produced with electron-builder's native NSIS toolset (`toolsets.nsis: 1.2.1`); no Rosetta or Wine needed. Tagging `vX.Y.Z` (matching `package.json`) runs the *Release desktop apps* workflow, which builds macOS + Windows on GitHub runners and publishes the release.
 
 ---
 
