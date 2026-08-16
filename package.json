@@ -74,5 +74,6 @@
   "repository": "github:koneb71/djkado",
   "author": "koneb71",
   "homepage": "https://github.com/koneb71/djkado",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.8.0"
 }
