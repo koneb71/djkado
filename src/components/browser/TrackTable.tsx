@@ -1,7 +1,10 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'motion/react';
-import { Music, Radio, ArrowUpDown, Layers } from 'lucide-react';
+import { Music, Radio, ArrowUpDown, Layers, MoreHorizontal, ListPlus } from 'lucide-react';
+import { toast } from 'sonner';
+import { useCrates } from '@/store/crates';
+import { TrackMenu, type TrackMenuState } from './TrackMenu';
 import { useStems } from '@/store/stems';
 import type { TrackRef } from '@/services/tracks/TrackRef';
 import { isStreamTrack } from '@/services/tracks/TrackRef';
@@ -19,11 +22,15 @@ import { Skeleton } from '@/ui/Skeleton';
 import { useIsMobile } from '@/mobile/useIsMobile';
 import { useMobileUi } from '@/mobile/store';
 
-const COLS = 'grid-cols-[36px_minmax(180px,2fr)_minmax(120px,1.4fr)_64px_48px_56px_120px]';
-const COLS_MOBILE = 'grid-cols-[34px_minmax(0,1fr)_56px_72px]';
+const COLS = 'grid-cols-[36px_minmax(180px,2fr)_minmax(120px,1.4fr)_64px_48px_56px_150px]';
+const COLS_MOBILE = 'grid-cols-[34px_minmax(0,1fr)_56px_104px]';
 
-export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[]; loading?: boolean; emptyHint?: string }) {
+export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: TrackRef[]; loading?: boolean; emptyHint?: string; crateId?: string }) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<TrackMenuState | null>(null);
+  const enqueue = useCrates((s) => s.enqueue);
+  const queuedIds = useCrates((s) => s.queue);
+  const queuedSet = useMemo(() => new Set(queuedIds.map((q) => q.trackId)), [queuedIds]);
   const search = useLibrary((s) => s.search);
   const sortKey = useLibrary((s) => s.sortKey);
   const sortDir = useLibrary((s) => s.sortDir);
@@ -115,6 +122,11 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
                 }}
                 onClick={() => select(t.meta.id)}
                 onDoubleClick={() => loadTo(t, focusedDeck)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  select(t.meta.id);
+                  setMenu({ track: t, x: e.clientX, y: e.clientY, crateId });
+                }}
                 className={cn('group absolute left-0 top-0 grid w-full cursor-grab items-center gap-2 px-3 text-xs active:cursor-grabbing', cols, vi.index % 2 ? 'bg-white/[0.015]' : '', isSel ? 'bg-accent/10' : 'hover:bg-white/[0.04]')}
                 style={{ height: vi.size, transform: `translateY(${vi.start}px)` }}
               >
@@ -126,6 +138,7 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate font-medium text-text">{t.meta.title}</span>
                     {stream && <Radio size={10} className="shrink-0 text-warn" />}
+                    {queuedSet.has(t.meta.id) && <span className="shrink-0 rounded bg-accent/20 px-1 text-[8px] font-bold uppercase text-accent">Q</span>}
                     {stemsReady[t.meta.id] && <Layers size={10} className="shrink-0 text-[#f472b6]" aria-label="Stems ready" />}
                   </div>
                   {mobile && <div className="truncate text-[11px] text-text-dim">{t.meta.artist}{t.meta.durationSec ? ` · ${formatTime(t.meta.durationSec)}` : ''}</div>}
@@ -160,12 +173,39 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
                       {id}
                     </motion.button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      enqueue([t]);
+                      toast.success('Added to queue', { duration: 1200 });
+                    }}
+                    className={cn('flex items-center justify-center rounded border border-border text-text-dim opacity-60 hover:opacity-100 hover:text-text group-hover:opacity-100', mobile ? 'h-9 w-8 opacity-100' : 'h-5 w-6')}
+                    title="Add to queue"
+                    aria-label="Add to queue"
+                  >
+                    <ListPlus size={mobile ? 14 : 12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      setMenu({ track: t, x: r.right - 230, y: r.bottom + 4, crateId });
+                    }}
+                    className={cn('flex items-center justify-center rounded border border-border text-text-dim opacity-60 hover:opacity-100 hover:text-text group-hover:opacity-100', mobile ? 'h-9 w-7 opacity-100' : 'h-5 w-5')}
+                    title="More"
+                    aria-label="Track menu"
+                  >
+                    <MoreHorizontal size={mobile ? 14 : 12} />
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+      <TrackMenu state={menu} onClose={() => setMenu(null)} />
     </div>
   );
 }

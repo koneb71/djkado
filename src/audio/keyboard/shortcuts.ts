@@ -65,6 +65,9 @@ export const DEFAULT_KEYMAP: KeyBinding[] = [
   { key: 'Digit4', action: 'deck.stems.other.mute', label: 'Mute other (focused deck)', shift: true },
   { key: 'KeyP', action: 'deck.stems.panel', label: 'Stems panel (focused deck)', shift: true },
   { key: 'Tab', action: 'deck.padMode.next', label: 'Cycle pad mode (focused deck)' },
+  { key: 'KeyQ', action: 'browser.queue', label: 'Add selected track to queue', shift: true },
+  { key: 'KeyA', action: 'automix.toggle', label: 'Auto DJ on/off', shift: true },
+  { key: 'KeyS', action: 'automix.skip', label: 'Auto DJ: mix into next now', shift: true },
 ];
 
 const isTyping = (e: KeyboardEvent) => {

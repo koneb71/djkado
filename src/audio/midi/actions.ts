@@ -5,7 +5,12 @@ import { useUi } from '@/store/ui';
 import { useLibrary } from '@/store/library';
 import { useSampler } from '../engine/Sampler';
 import { useStems } from '@/store/stems';
+import { useCrates } from '@/store/crates';
+import { useAutomix } from '@/store/automix';
+import { Automix } from '../engine/Automix';
 import { ROLL_SIZES, JUMP_SIZES } from '@/components/deck/padSizes';
+import { findTrack } from '@/services/tracks/registry';
+import type { TrackRef } from '@/services/tracks/TrackRef';
 
 /**
  * Central action registry. Both keyboard shortcuts and MIDI mappings dispatch through here so
@@ -21,6 +26,7 @@ export type ActionId =
   | 'browser.up' | 'browser.down' | 'browser.loadFocused'
   | 'sampler.1' | 'sampler.2' | 'sampler.3' | 'sampler.4' | 'sampler.5' | 'sampler.6' | 'sampler.7' | 'sampler.8'
   | 'ui.layout' | 'ui.sampler' | 'ui.library' | 'record.toggle'
+  | 'browser.queue' | 'browser.queueNext' | 'automix.toggle' | 'automix.skip'
   | 'deck.stems.toggle' | 'deck.stems.prepare' | 'deck.stems.panel'
   | 'deck.stems.vocals.mute' | 'deck.stems.drums.mute' | 'deck.stems.bass.mute' | 'deck.stems.other.mute'
   | 'deck.stems.vocals.solo' | 'deck.stems.drums.solo' | 'deck.stems.bass.solo' | 'deck.stems.other.solo'
@@ -40,6 +46,7 @@ export const ACTION_LABELS: Partial<Record<ActionId, string>> = {
   'deck.stems.vocals.level': 'Vocals level', 'deck.stems.drums.level': 'Drums level', 'deck.stems.bass.level': 'Bass level', 'deck.stems.other.level': 'Other level',
   'deck.padMode.hotcue': 'Pads: hot cue', 'deck.padMode.roll': 'Pads: roll', 'deck.padMode.slicer': 'Pads: slicer', 'deck.padMode.beatjump': 'Pads: beat jump', 'deck.padMode.next': 'Pads: next mode',
   'browser.up': 'Browse up', 'browser.down': 'Browse down', 'browser.loadFocused': 'Load to focused deck', 'ui.layout': 'Toggle 2/4 decks', 'ui.sampler': 'Toggle sampler', 'ui.library': 'Toggle library', 'record.toggle': 'Record',
+  'browser.queue': 'Add selected to queue', 'browser.queueNext': 'Play selected next', 'automix.toggle': 'Auto DJ on/off', 'automix.skip': 'Auto DJ: skip / mix now',
 };
 
 export interface ActionContext {
@@ -157,6 +164,10 @@ export function performAction(action: ActionId, value: number, ctx: ActionContex
     case 'ui.sampler': if (pressed) useUi.getState().setSamplerOpen(!useUi.getState().samplerOpen); break;
     case 'ui.library': if (pressed) useUi.getState().setLibraryOpen(!useUi.getState().libraryOpen); break;
     case 'record.toggle': if (pressed) AudioEngine.recorder.toggle(); break;
+    case 'browser.queue': if (pressed) queueSelected(false); break;
+    case 'browser.queueNext': if (pressed) queueSelected(true); break;
+    case 'automix.toggle': if (pressed) useAutomix.getState().setEnabled(!useAutomix.getState().enabled); break;
+    case 'automix.skip': if (pressed) Automix.skip(); break;
     case 'deck.stems.toggle': if (pressed) dk.setStemsActive(!useStems.getState().decks[deckId].active); break;
     case 'deck.stems.prepare': if (pressed) void dk.prepareStems('high'); break;
     case 'deck.stems.panel': if (pressed) useUi.getState().toggleStems(deckId); break;
@@ -166,6 +177,12 @@ export function performAction(action: ActionId, value: number, ctx: ActionContex
 function currentList() {
   const s = useLibrary.getState();
   if (s.source === 'local') return s.localTracks;
+  if (s.source === 'crates') {
+    const c = useCrates.getState();
+    const crate = c.crates.find((x) => x.id === c.selectedCrateId) ?? c.crates[0];
+    return crate ? crate.trackIds.map((id) => findTrack(id)).filter((t): t is TrackRef => !!t) : [];
+  }
+  if (s.source === 'queue') return [];
   const key = `${s.source}:${s.search.trim() || s.selectedPlaylist[s.source]}`;
   return s.playlistTracks[key] ?? [];
 }
@@ -177,6 +194,12 @@ function moveSelection(dir: number) {
   const idx = list.findIndex((t) => t.meta.id === s.selectedTrackId);
   const next = list[Math.max(0, Math.min(list.length - 1, idx + dir))];
   s.select(next.meta.id);
+}
+
+function queueSelected(next: boolean) {
+  const s = useLibrary.getState();
+  const t = currentList().find((x) => x.meta.id === s.selectedTrackId);
+  if (t) useCrates.getState().enqueue([t], { next });
 }
 
 function loadSelected(deck: DeckId) {

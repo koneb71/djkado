@@ -17,6 +17,9 @@ import { useMobileUi, type MobileTab } from '@/mobile/store';
 import { usePortrait } from '@/mobile/useIsMobile';
 import { useNativeApp, tap } from '@/mobile/native';
 import { useUi } from '@/store/ui';
+import { useAutomix } from '@/store/automix';
+import { useCrates } from '@/store/crates';
+import { useLibrary } from '@/store/library';
 import { useRecorder } from '@/audio/engine/Recorder';
 import { AudioEngine } from '@/audio/engine/AudioEngine';
 import { masterMeter } from '@/store/runtime';
@@ -45,6 +48,9 @@ export function MobileShell() {
   const setSettingsOpen = useUi((s) => s.setSettingsOpen);
   const recording = useRecorder((s) => s.recording);
   const elapsed = useRecorder((s) => s.elapsed);
+  const automixOn = useAutomix((s) => s.enabled);
+  const setAutomix = useAutomix((s) => s.setEnabled);
+  const setSource = useLibrary((s) => s.setSource);
 
   useEffect(() => {
     document.title = 'DJKado';
@@ -63,6 +69,22 @@ export function MobileShell() {
         </span>
         <div className="flex-1" />
         <VuMeter channel={masterMeter} stereo horizontal width={8} height={70} />
+        <button
+          type="button"
+          onClick={() => {
+            tap();
+            if (!automixOn && useCrates.getState().queue.length === 0) {
+              // enabling with an empty queue → take the user to the queue tab
+              setSource('queue');
+              setTab('library');
+            }
+            setAutomix(!automixOn);
+          }}
+          className={cn('flex h-8 items-center gap-1 rounded-md border px-2 text-[10px] font-bold uppercase', automixOn ? 'border-accent/60 bg-accent/15 text-accent' : 'border-border bg-panel-3 text-text-dim')}
+          aria-label="Auto DJ"
+        >
+          <Sparkles size={11} className={automixOn ? 'animate-pulse' : ''} /> Auto
+        </button>
         <button
           type="button"
           onClick={() => {

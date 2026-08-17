@@ -1,5 +1,7 @@
 import { motion } from 'motion/react';
-import { Disc3, Grid2x2, Keyboard, LayoutPanelLeft, Settings, Music2 } from 'lucide-react';
+import { Disc3, Grid2x2, Keyboard, LayoutPanelLeft, Settings, Music2, Sparkles } from 'lucide-react';
+import { useAutomix } from '@/store/automix';
+import { useLibrary } from '@/store/library';
 import { useUi } from '@/store/ui';
 import { Button } from '@/ui/Button';
 import { Tooltip } from '@/ui/Tooltip';
@@ -20,6 +22,11 @@ export function TopBar() {
   const setKeyboardHelpOpen = useUi((s) => s.setKeyboardHelpOpen);
   const master = useMixer((s) => s.master);
   const setMaster = useMixer((s) => s.setMaster);
+  const automixOn = useAutomix((s) => s.enabled);
+  const setAutomix = useAutomix((s) => s.setEnabled);
+  const automixPhase = useAutomix((s) => s.phase);
+  const setSource = useLibrary((s) => s.setSource);
+  const setLibraryOpen = useUi((s) => s.setLibraryOpen);
 
   return (
     <header className="app-drag relative z-30 flex h-[52px] shrink-0 items-center gap-3 border-b border-border bg-gradient-to-b from-panel-2 to-panel px-3" style={isMacDesktop() ? { paddingLeft: 84 } : undefined}>
@@ -51,6 +58,23 @@ export function TopBar() {
         <Tooltip label="Sampler (S)">
           <Button size="sm" variant="ghost" active={samplerOpen} activeColor="var(--color-deck-c)" onClick={() => setSamplerOpen(!samplerOpen)} aria-label="Sampler">
             <Music2 size={14} /> Sampler
+          </Button>
+        </Tooltip>
+        <Tooltip label={automixOn ? 'Auto DJ on — click to stop (right-click: open queue)' : 'Auto DJ: play the queue with automatic mixes'}>
+          <Button
+            size="sm"
+            variant="ghost"
+            active={automixOn}
+            activeColor="var(--color-accent)"
+            onClick={() => setAutomix(!automixOn)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setSource('queue');
+              setLibraryOpen(true);
+            }}
+            aria-label="Auto DJ"
+          >
+            <Sparkles size={14} className={automixOn && automixPhase === 'mixing' ? 'animate-pulse' : ''} /> Auto
           </Button>
         </Tooltip>
       </div>

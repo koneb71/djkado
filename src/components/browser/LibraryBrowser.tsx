@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { FolderOpen, FilePlus2, HardDrive, History, ListMusic, Search, X, Loader2 } from 'lucide-react';
+import { FolderOpen, FilePlus2, HardDrive, History, ListMusic, Search, X, Loader2, Box, ListOrdered } from 'lucide-react';
+import { useCrates } from '@/store/crates';
+import { useAutomix } from '@/store/automix';
+import { CratesView } from './CratesView';
+import { QueueView } from './QueueView';
 import { useLibrary, type SourceId } from '@/store/library';
 import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
 import { getSource, useSource } from '@/services/sources';
@@ -18,6 +22,8 @@ const TABS: { id: SourceId; label: string; icon: React.ReactNode }[] = [
   { id: 'spotify', label: 'Spotify', icon: <span className="h-2 w-2 rounded-full bg-[#1DB954]" /> },
   { id: 'apple', label: 'Apple Music', icon: <span className="h-2 w-2 rounded-full bg-[#fa2d48]" /> },
   { id: 'history', label: 'History', icon: <History size={12} /> },
+  { id: 'crates', label: 'Crates', icon: <Box size={12} /> },
+  { id: 'queue', label: 'Queue', icon: <ListOrdered size={12} /> },
 ];
 
 export function LibraryBrowser() {
@@ -26,26 +32,37 @@ export function LibraryBrowser() {
   const search = useLibrary((s) => s.search);
   const setSearch = useLibrary((s) => s.setSearch);
   const scanning = useLibrary((s) => s.scanning);
+  const queueLen = useCrates((s) => s.queue.length);
+  const automixOn = useAutomix((s) => s.enabled);
+  const mobile = useIsMobile();
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // keep the active tab visible in the horizontally scrolling strip on phones
+    if (!mobile) return;
+    tabsRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  }, [source, mobile]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-2 py-1.5">
-        <div className="flex items-center gap-0.5 rounded-md bg-bg-elev p-0.5">
+      <div className={cn('flex items-center gap-2 border-b border-border px-2 py-1.5', mobile ? 'overflow-x-auto' : 'flex-wrap')}>
+        <div ref={tabsRef} className="flex shrink-0 items-center gap-0.5 rounded-md bg-bg-elev p-0.5">
           {TABS.map((t) => (
-            <button key={t.id} type="button" onClick={() => setSource(t.id)} className={cn('relative flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] font-semibold', source === t.id ? 'text-text' : 'text-text-faint hover:text-text-dim')}>
+            <button key={t.id} type="button" data-active={source === t.id} onClick={() => setSource(t.id)} className={cn('relative flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] font-semibold', source === t.id ? 'text-text' : 'text-text-faint hover:text-text-dim')}>
               {source === t.id && <motion.span layoutId="tab-pill" className="absolute inset-0 rounded bg-panel-3" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />}
               <span className="relative flex items-center gap-1.5">
-                {t.icon} {t.label}
+                {t.icon} {mobile && (t.id === 'apple' ? 'Apple' : t.label) || t.label}
+                {t.id === 'queue' && queueLen > 0 && <span className={cn('rounded-full px-1.5 font-mono text-[9px] leading-4', automixOn ? 'bg-accent text-bg' : 'bg-panel-3 text-text-dim')}>{queueLen}</span>}
               </span>
             </button>
           ))}
         </div>
+        {source !== 'queue' && (
         <div className="relative ml-1 min-w-[160px] flex-1 max-w-sm">
           <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-faint" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={source === 'local' || source === 'history' ? 'Filter tracks…' : `Search ${source === 'spotify' ? 'Spotify' : 'Apple Music'}…`}
+            placeholder={source === 'local' || source === 'history' || source === 'crates' ? 'Filter tracks…' : `Search ${source === 'spotify' ? 'Spotify' : 'Apple Music'}…`}
             className="h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-7 text-xs text-text placeholder:text-text-faint outline-none focus:border-accent"
             onKeyDown={(e) => e.stopPropagation()}
           />
@@ -55,6 +72,7 @@ export function LibraryBrowser() {
             </button>
           )}
         </div>
+        )}
         <div className="flex-1" />
         {scanning.active && (
           <span className="flex items-center gap-1 text-[10px] text-text-dim">
@@ -74,6 +92,8 @@ export function LibraryBrowser() {
       </div>
       {source === 'local' && <LocalView />}
       {source === 'history' && <HistoryView />}
+      {source === 'crates' && <CratesView />}
+      {source === 'queue' && <QueueView />}
       {(source === 'spotify' || source === 'apple') && <StreamView id={source} />}
     </div>
   );

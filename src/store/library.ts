@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { TrackRef } from '@/services/tracks/TrackRef';
 
-export type SourceId = 'local' | 'spotify' | 'apple' | 'history';
+export type SourceId = 'local' | 'spotify' | 'apple' | 'history' | 'crates' | 'queue';
 
 export interface Playlist {
   id: string;
@@ -42,8 +42,8 @@ export const useLibrary = create<LibraryState>((set) => ({
   source: 'local',
   search: '',
   localTracks: [],
-  playlists: { local: [], spotify: [], apple: [], history: [] },
-  selectedPlaylist: { local: null, spotify: null, apple: null, history: null },
+  playlists: { local: [], spotify: [], apple: [], history: [], crates: [], queue: [] },
+  selectedPlaylist: { local: null, spotify: null, apple: null, history: null, crates: null, queue: null },
   playlistTracks: {},
   loading: false,
   scanning: { active: false, done: 0, total: 0 },
