@@ -37,3 +37,15 @@ export function usePortrait(): boolean {
 }
 
 export const isNative = () => Capacitor.isNativePlatform();
+
+/** True on short desktop windows (< 980 px tall) — used to shrink fixed-height controls like the mixer. */
+export function useShortViewport(): boolean {
+  const [s, setS] = useState(() => (typeof window === 'undefined' ? false : window.matchMedia('(max-height: 979px)').matches));
+  useEffect(() => {
+    const mq = window.matchMedia('(max-height: 979px)');
+    const on = () => setS(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return s;
+}

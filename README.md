@@ -21,15 +21,17 @@ Open **http://127.0.0.1:5173**, click once to power on the audio engine, then dr
 
 | Area | Highlights |
 |---|---|
-| **Decks** (2 ↔ 4, animated morph) | Jog wheels (vinyl scratch + pitch bend, inertia), scrolling & overview waveforms (zoom, drag-scrub, beat/bar grid, cue & loop markers), CUE / Play / Sync (tempo + continuous phase lock) / Key lock / Slip / Quantize / Censor / Brake / Backspin, pitch fader (±8/16/50 %), 8 hot cues, auto-loop 1/32–64 beats, loop in/out/reloop, beat jump, key shift ± semitones |
+| **Decks** (2 ↔ 4, animated morph) | Jog wheels (vinyl scratch + pitch bend, inertia), scrolling & overview waveforms (zoom, drag-scrub, beat/bar grid, cue & loop markers), CUE / Play / Sync (tempo + continuous phase lock) / Key lock / Slip / Quantize / Censor / Brake / Backspin, pitch fader (±8/16/50 %), **performance pads** (8 hot cues · loop roll 1/16–8 · 8-slice slicer with slip · beat jump ±1–16), auto-loop 1/32–64 beats, loop in/out/reloop, key shift ± semitones |
 | **Analysis** (Web Worker pool) | Onset-based BPM (±0.3 BPM), beat phase (±15 ms), key (Krumhansl + EDMA profiles → Camelot), 3-band waveform, auto-gain — cached in IndexedDB |
-| **Mixer** | Gain, 3-band EQ with full kill, dual LP/HP filter, faders with VU meters, headphone cue + cue-mix, crossfader (linear / power / cut) with A/B/thru assignment, master limiter + meters |
+| **Mixer** | Gain, 3-band EQ with full kill, dual LP/HP filter, faders with VU meters, crossfader (linear / power / cut) with A/B/thru assignment, master limiter + meters |
+| **Headphone cue** | Real PFL on a **second audio output** (`AudioContext.setSinkId` — USB card / Bluetooth headphones), cue-mix + phones volume, split cue (L = cue, R = master), library **pre-listen** button per track; falls back to blending the cue into the master when no headphone output is set |
 | **FX** | 3 insert slots per deck: Echo, Reverb, Flanger, Phaser, Bitcrusher (AudioWorklet), Filter LFO, Gate — beat-synced to the deck's tempo |
 | **Sampler** | 2 banks × 8 pads (one-shot / hold / loop), synthesized starter kit, load your own samples by click or drop |
 | **Stems** | On-device 4-stem separation (vocals / drums / bass / other) with HTDemucs on WebGPU — per-deck stem faders, mute/solo, Acapella / Instrumental / Drumless presets, sample-accurate mixing in the deck worklet, cached in IndexedDB |
 | **Recording** | Master mix to WebM/Opus (or WAV) with one click |
 | **Control** | VirtualDJ-like keyboard map (press `?`), Web MIDI with learn mode, LED feedback hooks |
-| **Library** | Local files & folders (File System Access API, tags + artwork via music-metadata), History, key-compatible track highlighting, virtualized table, drag-to-deck |
+| **Library** | Local files & folders (File System Access API, tags + artwork via music-metadata), History, **crates** (playlists, drag-to-crate, rename/delete), **play queue** (reorder, play-next, shuffle), row context menu, key-compatible track highlighting, virtualized table, drag-to-deck |
+| **Auto DJ** | Plays the queue on decks A/B: preloads the next track, tempo-matches + phase-aligns via the sync engine, crossfades over 4/8/16/32 bars with optional bass swap, glides back to the track's own tempo, skips missing files, *Skip* to mix now — works on desktop and phone |
 | **Streaming** | Spotify & Apple Music sources with the same browse → load workflow. Ships in **mock mode** (demo catalog) until you add credentials — see below |
 
 ### The hybrid engine (why streaming decks are "limited")
@@ -122,7 +124,7 @@ Notes: local files come in through the system picker (Add files → Android docu
 
 ## Keyboard (press `?` in the app)
 
-`Q/W` play A/B · `A/S` cue · `Z/X` sync · `1-4` / `7-0` hot cues · `E/O` loop · `R/T` `U/I` loop ½/×2 · `D/F` `J/K` bend · `C/V` censor · `G/H` slip · `↑/↓` browse · `Shift+←/→` load to A/B · `Enter` load to focused deck · `Space` play focused · `L` library · `N` 2/4 decks · `M` sampler · `F1–F8` sampler pads · `Shift+B` record. Shift-drag knobs for fine control, double-click to reset, scroll the waveform to zoom.
+`Q/W` play A/B · `A/S` cue · `Z/X` sync · `1-4` / `7-0` hot cues · `E/O` loop · `R/T` `U/I` loop ½/×2 · `D/F` `J/K` bend · `C/V` censor · `G/H` slip · `↑/↓` browse · `Shift+←/→` load to A/B · `Enter` load to focused deck · `Space` play focused · `L` library · `N` 2/4 decks · `M` sampler · `F1–F8` sampler pads · `Shift+B` record · `Tab` cycle pad mode · `Shift+Q` add selected to queue · `Shift+A` Auto DJ on/off · `Shift+S` Auto DJ skip. Shift-drag knobs for fine control, double-click to reset, scroll the waveform to zoom.
 
 ---
 
@@ -133,7 +135,7 @@ electron/                  Electron main (embedded server, menu, updater, permis
 android/                   Capacitor Android project (Gradle; version derives from package.json)
 src/mobile/, src/components/mobile/  phone layout (MobileShell/MobileDeck/MobileMixer), Capacitor glue (status bar, keep-awake, back button, haptics)
 server/                    Hono API (app.ts shared with the desktop app): health, Apple developer token, preview proxy, static renderer
-src/audio/engine/          AudioEngine (singleton), MasterBus, ChannelStrip, Crossfader, Deck, Sampler, Recorder
+src/audio/engine/          AudioEngine (singleton), MasterBus (+ headphone/cue section), ChannelStrip, Crossfader, Deck, Sampler, Recorder, Automix, Prelisten
 src/audio/backends/        DeckBackend contract, WebAudioBackend (worklet), MockStreamBackend
 src/audio/worklets/        deck-player (variable-rate player), bitcrusher; deck-player-core is pure & unit-tested
 src/audio/dsp/             fft, biquad, onset, bpm, beatgrid, key, waveform, gain (+ tests)
@@ -144,7 +146,7 @@ src/audio/midi|keyboard/   action registry shared by MIDI learn + keyboard map
 src/services/sources/      MusicSource interface, mock Spotify/Apple, registry with feature flags
 src/services/spotify|appleMusic/  real adapters (PKCE, Web API, MusicKit loader) activated by env
 src/services/localLibrary/ File System Access, tags, IndexedDB schema (analysis, cues, handles, history)
-src/store/                 Zustand (decks, mixer, library, ui, fx) + runtime.ts (high-frequency channels for canvases)
+src/store/                 Zustand (decks, mixer, library, crates/queue, automix, ui, fx, stems) + runtime.ts (high-frequency channels for canvases)
 src/components/            deck, waveform, jog, mixer, fx, sampler, browser, settings, overlays, layout
 src/desktop/               renderer-side desktop glue (bridge, menu actions, hooks)
 src/ui/                    Knob, Fader, Button, Led, Panel, Tooltip, Toggle, tokens.css, motion presets

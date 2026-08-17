@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'motion/react';
-import { Music, Radio, ArrowUpDown, Layers, MoreHorizontal, ListPlus } from 'lucide-react';
+import { Music, Radio, ArrowUpDown, Layers, MoreHorizontal, ListPlus, Headphones, Loader2 } from 'lucide-react';
+import { Prelisten, usePrelisten } from '@/audio/engine/Prelisten';
 import { toast } from 'sonner';
 import { useCrates } from '@/store/crates';
 import { TrackMenu, type TrackMenuState } from './TrackMenu';
@@ -22,7 +23,7 @@ import { Skeleton } from '@/ui/Skeleton';
 import { useIsMobile } from '@/mobile/useIsMobile';
 import { useMobileUi } from '@/mobile/store';
 
-const COLS = 'grid-cols-[36px_minmax(180px,2fr)_minmax(120px,1.4fr)_64px_48px_56px_150px]';
+const COLS = 'grid-cols-[36px_minmax(180px,2fr)_minmax(120px,1.4fr)_64px_48px_56px_178px]';
 const COLS_MOBILE = 'grid-cols-[34px_minmax(0,1fr)_56px_104px]';
 
 export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: TrackRef[]; loading?: boolean; emptyHint?: string; crateId?: string }) {
@@ -31,6 +32,7 @@ export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: Tr
   const enqueue = useCrates((s) => s.enqueue);
   const queuedIds = useCrates((s) => s.queue);
   const queuedSet = useMemo(() => new Set(queuedIds.map((q) => q.trackId)), [queuedIds]);
+  const pfl = usePrelisten();
   const search = useLibrary((s) => s.search);
   const sortKey = useLibrary((s) => s.sortKey);
   const sortDir = useLibrary((s) => s.sortDir);
@@ -133,6 +135,11 @@ export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: Tr
                 <div className="relative h-7 w-7 overflow-hidden rounded bg-panel-3">
                   {t.meta.artworkUrl ? <img src={t.meta.artworkUrl} alt="" className="h-full w-full object-cover" loading="lazy" draggable={false} /> : <Music size={12} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-text-faint" />}
                   {isLoaded && <span className="absolute inset-0 ring-2 ring-inset ring-accent/70" />}
+                  {pfl.trackId === t.meta.id && pfl.playing && (
+                    <span className="absolute inset-x-0 bottom-0 h-0.5 bg-black/40">
+                      <span className="block h-full bg-success" style={{ width: `${pfl.duration ? (pfl.position / pfl.duration) * 100 : 0}%` }} />
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -157,6 +164,24 @@ export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: Tr
                   </>
                 )}
                 <div className="flex items-center gap-1">
+                  {!stream && !mobile && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void Prelisten.toggle(t);
+                      }}
+                      onWheel={(e) => {
+                        // scrub while pre-listening
+                        if (pfl.trackId === t.meta.id && pfl.playing && pfl.duration) Prelisten.seek((pfl.position + (e.deltaY > 0 ? 10 : -10)) / pfl.duration);
+                      }}
+                      className={cn('flex items-center justify-center rounded border font-black opacity-60 hover:opacity-100 group-hover:opacity-100', mobile ? 'h-9 w-8 opacity-100' : 'h-5 w-6', pfl.trackId === t.meta.id && (pfl.playing || pfl.loading) ? 'border-success/60 bg-success/15 text-success opacity-100' : 'border-border text-text-dim')}
+                      title="Pre-listen in headphones (PFL)"
+                      aria-label="Pre-listen"
+                    >
+                      {pfl.trackId === t.meta.id && pfl.loading ? <Loader2 size={12} className="animate-spin" /> : <Headphones size={mobile ? 14 : 12} />}
+                    </button>
+                  )}
                   {visibleDecks.map((id) => (
                     <motion.button
                       key={id}

@@ -1,6 +1,6 @@
 import groovy.json.JsonSlurper
 
-// App version derives from the web app's package.json: versionName = "0.3.0", versionCode = 0*10000 + 3*100 + 0
+// App version derives from the web app's package.json: versionName = "0.4.0", versionCode = 0*10000 + 4*100 + 0
 def pkg = new JsonSlurper().parse(file("../../package.json"))
 def semver = (pkg.version as String).tokenize('.').collect { it.toInteger() }
 ext.appVersionName = pkg.version as String

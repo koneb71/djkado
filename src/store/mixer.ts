@@ -23,6 +23,9 @@ interface MixerState {
   master: number; // 0..1
   cueMix: number; // 0 = cue, 1 = master (headphone blend)
   cueVolume: number;
+  /** headphone output device (AudioContext.setSinkId); null = blend cue into master */
+  cueDeviceId: string | null;
+  splitCue: boolean;
   setChannel: (id: DeckId, patch: Partial<ChannelValues>) => void;
   setCrossfader: (v: number) => void;
   setCurve: (c: CrossfaderCurve) => void;
@@ -30,6 +33,8 @@ interface MixerState {
   setMaster: (v: number) => void;
   setCueMix: (v: number) => void;
   setCueVolume: (v: number) => void;
+  setCueDeviceId: (id: string | null) => void;
+  setSplitCue: (b: boolean) => void;
 }
 
 export const useMixer = create<MixerState>()(
@@ -42,6 +47,8 @@ export const useMixer = create<MixerState>()(
       master: 0.85,
       cueMix: 0,
       cueVolume: 0.8,
+      cueDeviceId: null,
+      splitCue: false,
       setChannel: (id, patch) => set((s) => ({ channels: { ...s.channels, [id]: { ...s.channels[id], ...patch } } })),
       setCrossfader: (v) => set({ crossfader: Math.max(-1, Math.min(1, v)) }),
       setCurve: (curve) => set({ curve }),
@@ -49,7 +56,9 @@ export const useMixer = create<MixerState>()(
       setMaster: (master) => set({ master }),
       setCueMix: (cueMix) => set({ cueMix }),
       setCueVolume: (cueVolume) => set({ cueVolume }),
+      setCueDeviceId: (cueDeviceId) => set({ cueDeviceId }),
+      setSplitCue: (splitCue) => set({ splitCue }),
     }),
-    { name: 'djkado.mixer', partialize: (s) => ({ curve: s.curve, master: s.master, assign: s.assign }) },
+    { name: 'djkado.mixer', partialize: (s) => ({ curve: s.curve, master: s.master, assign: s.assign, cueDeviceId: s.cueDeviceId, splitCue: s.splitCue, cueVolume: s.cueVolume }) },
   ),
 );

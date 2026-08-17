@@ -62,7 +62,30 @@ class AudioEngineImpl {
     this._recorder = new Recorder(ctx, this._master);
     this.bindMixerStore();
     this.applyMixer(useMixer.getState());
-    // stream volume push on fader / xf change
+    // headphone output (persisted); applied once the context is unlocked
+    this.onUnlock(() => void this.applyHeadphoneDevice(useMixer.getState().cueDeviceId));
+  }
+
+  private lastCueDevice: string | null | undefined;
+  /** Route the cue bus to `deviceId` (null = fallback blend). Resolves false when the device can't be opened. */
+  async applyHeadphoneDevice(deviceId: string | null): Promise<boolean> {
+    if (!this._master) return false;
+    if (deviceId === this.lastCueDevice) return true;
+    this.lastCueDevice = deviceId;
+    try {
+      await this._master.setHeadphoneDevice(deviceId);
+      this.applyMixer(useMixer.getState());
+      return true;
+    } catch (e) {
+      console.warn('[cue] headphone output failed', e);
+      await this._master.setHeadphoneDevice(null).catch(() => {});
+      this.lastCueDevice = null;
+      this.applyMixer(useMixer.getState());
+      return false;
+    }
+  }
+  get headphonesActive() {
+    return !!this._master?.headphonesActive;
   }
 
   /** Must be called from a user gesture. */
@@ -77,6 +100,7 @@ class AudioEngineImpl {
     }
     const ok = ctx.state === 'running';
     if (ok) {
+      void this._master?.resumeAll();
       this.unlockListeners.forEach((l) => l());
       this.unlockListeners = [];
     }
@@ -87,10 +111,19 @@ class AudioEngineImpl {
     else this.unlockListeners.push(cb);
   }
 
+  /** set by the pre-listen player so the fallback cue blend opens while previewing */
+  prelistenActive = false;
+  reapplyMixer() {
+    this.applyMixer(useMixer.getState());
+  }
+
   /* --------------------------------- mixer --------------------------------- */
   private bindMixerStore() {
     this.mixerUnsub?.();
-    this.mixerUnsub = useMixer.subscribe((s) => this.applyMixer(s));
+    this.mixerUnsub = useMixer.subscribe((s) => {
+      this.applyMixer(s);
+      if (this.isReady && s.cueDeviceId !== this.lastCueDevice) void this.applyHeadphoneDevice(s.cueDeviceId);
+    });
   }
 
   private applyMixer(s: ReturnType<typeof useMixer.getState>) {
@@ -114,8 +147,9 @@ class AudioEngineImpl {
       if (c.cue) anyCue = true;
       d.pushStreamVolume();
     }
-    // Without a dedicated headphone output we blend cue into master when cueMix < 1 and any cue is active
-    this._master.cueInput.gain.setTargetAtTime(anyCue ? (1 - s.cueMix) * s.cueVolume * 0.6 : 0, this.ctx.currentTime, 0.02);
+    // cue section: dedicated headphone output when configured, else blended into master while any cue is active
+    this._master.setCue({ cueMix: s.cueMix, cueVolume: s.cueVolume, anyCue: anyCue || this.prelistenActive });
+    this._master.setSplitCue(s.splitCue);
   }
 
   /* ---------------------------------- sync ---------------------------------- */

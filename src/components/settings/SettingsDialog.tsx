@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Radio, FolderSync } from 'lucide-react';
+import { Trash2, Radio, FolderSync, Headphones } from 'lucide-react';
+import { useMixer } from '@/store/mixer';
 import { toast } from 'sonner';
 import { Modal } from './Modal';
 import { useUi } from '@/store/ui';
@@ -49,10 +50,52 @@ export function SettingsDialog() {
   const [learnDeck, setLearnDeck] = useState<DeckId>('A');
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const canSink = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
+  const cueDeviceId = useMixer((s) => s.cueDeviceId);
+  const setCueDeviceId = useMixer((s) => s.setCueDeviceId);
+  const splitCue = useMixer((s) => s.splitCue);
+  const setSplitCue = useMixer((s) => s.setSplitCue);
+  const [phonesOk, setPhonesOk] = useState<boolean | null>(null);
+  const [namesGranted, setNamesGranted] = useState(false);
+
+  const refreshDevices = () =>
+    navigator.mediaDevices?.enumerateDevices?.().then((d) => {
+      const outs = d.filter((x) => x.kind === 'audiooutput');
+      setOutputs(outs);
+      setNamesGranted(outs.some((o) => !!o.label));
+    }).catch(() => {});
+
+  /** Device labels are only exposed after a media permission; ask once, then release the mic immediately. */
+  const revealNames = async () => {
+    try {
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+      ms.getTracks().forEach((t) => t.stop());
+      await refreshDevices();
+    } catch {
+      toast.error('Permission denied — device names stay hidden');
+    }
+  };
+
+  const chooseHeadphones = async (id: string) => {
+    const dev = id === 'none' ? null : id;
+    setCueDeviceId(dev);
+    if (!dev) {
+      setPhonesOk(null);
+      await AudioEngine.applyHeadphoneDevice(null);
+      return;
+    }
+    const ok = await AudioEngine.applyHeadphoneDevice(dev);
+    setPhonesOk(ok);
+    if (ok) toast.success('Headphone cue routed to the selected output');
+    else {
+      toast.error('Could not open that output for headphones');
+      setCueDeviceId(null);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
-    navigator.mediaDevices?.enumerateDevices?.().then((d) => setOutputs(d.filter((x) => x.kind === 'audiooutput'))).catch(() => {});
+    void refreshDevices();
+    setPhonesOk(AudioEngine.headphonesActive ? true : null);
     LocalLibrary.savedFolders().then((f) => setFolders(f.map((x) => ({ id: x.id, name: x.name }))));
   }, [open]);
 
@@ -71,7 +114,7 @@ export function SettingsDialog() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <section>
           <SectionLabel className="mb-1">Audio</SectionLabel>
-          <Row label="Output device" hint={canSink ? 'Master output (Chrome/Edge). Use a multi-output device for headphone cue.' : 'Output switching needs Chrome/Edge.'}>
+          <Row label="Master output" hint={canSink ? 'Speakers / PA (Chrome, Edge, desktop app).' : 'Output switching needs Chrome/Edge or the desktop app.'}>
             <select value={outputId} onChange={(e) => chooseOutput(e.target.value)} disabled={!canSink} className="h-7 max-w-[200px] rounded border border-border bg-bg-elev px-1 text-xs">
               <option value="default">System default</option>
               {outputs.map((o) => (
@@ -80,6 +123,36 @@ export function SettingsDialog() {
                 </option>
               ))}
             </select>
+          </Row>
+          <Row label="Headphone output" hint={canSink ? 'Cue + pre-listen go here (USB card, BT headphones).' : 'Needs Chrome/Edge or the desktop app.'}>
+            <div className="flex flex-col items-end gap-1">
+              <select value={cueDeviceId ?? 'none'} onChange={(e) => chooseHeadphones(e.target.value)} disabled={!canSink} className="h-7 max-w-[200px] rounded border border-border bg-bg-elev px-1 text-xs">
+                <option value="none">Off — blend cue into master</option>
+                <option value="default">System default output</option>
+                {outputs
+                  .filter((o) => o.deviceId !== 'default')
+                  .map((o) => (
+                    <option key={o.deviceId} value={o.deviceId}>
+                      {o.label || `Output ${o.deviceId.slice(0, 6)}`}
+                    </option>
+                  ))}
+              </select>
+              <div className="flex items-center gap-2 text-[10px] text-text-faint">
+                {phonesOk && (
+                  <span className="flex items-center gap-1 text-success">
+                    <Headphones size={11} /> Headphones active
+                  </span>
+                )}
+                {canSink && !namesGranted && (
+                  <button type="button" onClick={revealNames} className="underline hover:text-text">
+                    Show device names
+                  </button>
+                )}
+              </div>
+            </div>
+          </Row>
+          <Row label="Split cue" hint="Left ear = cue, right ear = master (mono).">
+            <Toggle checked={splitCue} onChange={setSplitCue} />
           </Row>
           <Row label="Latency" hint="Interactive AudioContext (lowest available)">
             <LatencyInfo />

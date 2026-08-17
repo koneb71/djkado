@@ -106,7 +106,7 @@ export function PadGrid({ id, compact, count = 8, mobile }: { id: DeckId; compac
             {m.label}
           </button>
         ))}
-        {mode === 'slicer' && <span className="ml-1 text-[9px] uppercase tracking-wider text-text-faint">8 beats · hold a slice</span>}
+        {mode === 'slicer' && <span className="ml-1 truncate text-[9px] uppercase tracking-wider text-text-faint" title="Slicer: 8-beat domain, hold a pad to loop that slice">8 beats</span>}
       </div>
       <div className={cn('grid gap-1', count === 8 ? (compact ? 'grid-cols-8' : 'grid-cols-4') : 'grid-cols-4', mobile && 'gap-1.5')}>
         {pads.map((i) => {
