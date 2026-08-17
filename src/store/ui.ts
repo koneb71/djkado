@@ -3,6 +3,13 @@ import { persist } from 'zustand/middleware';
 import type { DeckId } from '@/audio/engine/types';
 
 export type Layout = 2 | 4;
+export type PadMode = 'hotcue' | 'roll' | 'slicer' | 'beatjump';
+export const PAD_MODES: { id: PadMode; label: string }[] = [
+  { id: 'hotcue', label: 'Cue' },
+  { id: 'roll', label: 'Roll' },
+  { id: 'slicer', label: 'Slicer' },
+  { id: 'beatjump', label: 'Jump' },
+];
 
 interface UiState {
   layout: Layout;
@@ -10,6 +17,7 @@ interface UiState {
   libraryOpen: boolean;
   fxOpen: Record<DeckId, boolean>;
   stemsOpen: Record<DeckId, boolean>;
+  padMode: Record<DeckId, PadMode>;
   samplerOpen: boolean;
   settingsOpen: boolean;
   keyboardHelpOpen: boolean;
@@ -21,6 +29,7 @@ interface UiState {
   setLibraryOpen: (b: boolean) => void;
   toggleFx: (id: DeckId) => void;
   toggleStems: (id: DeckId) => void;
+  setPadMode: (id: DeckId, m: PadMode) => void;
   setSamplerOpen: (b: boolean) => void;
   setSettingsOpen: (b: boolean) => void;
   setKeyboardHelpOpen: (b: boolean) => void;
@@ -37,6 +46,7 @@ export const useUi = create<UiState>()(
       libraryOpen: true,
       fxOpen: { A: false, B: false, C: false, D: false },
       stemsOpen: { A: false, B: false, C: false, D: false },
+      padMode: { A: 'hotcue', B: 'hotcue', C: 'hotcue', D: 'hotcue' },
       samplerOpen: false,
       settingsOpen: false,
       keyboardHelpOpen: false,
@@ -47,6 +57,7 @@ export const useUi = create<UiState>()(
       setLibraryHeight: (libraryHeight) => set({ libraryHeight: Math.max(160, Math.min(700, libraryHeight)) }),
       setLibraryOpen: (libraryOpen) => set({ libraryOpen }),
       toggleFx: (id) => set((s) => ({ fxOpen: { ...s.fxOpen, [id]: !s.fxOpen[id] }, stemsOpen: { ...s.stemsOpen, [id]: false } })),
+      setPadMode: (id, m) => set((s) => ({ padMode: { ...s.padMode, [id]: m } })),
       toggleStems: (id) => set((s) => ({ stemsOpen: { ...s.stemsOpen, [id]: !s.stemsOpen[id] }, fxOpen: { ...s.fxOpen, [id]: false } })),
       setSamplerOpen: (samplerOpen) => set({ samplerOpen }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
@@ -55,6 +66,6 @@ export const useUi = create<UiState>()(
       setVinylMode: (vinylMode) => set({ vinylMode }),
       setWaveformZoom: (z) => set({ waveformZoom: Math.max(2, Math.min(40, z)) }),
     }),
-    { name: 'djkado.ui', partialize: (s) => ({ layout: s.layout, libraryHeight: s.libraryHeight, libraryOpen: s.libraryOpen, vinylMode: s.vinylMode, waveformZoom: s.waveformZoom, samplerOpen: s.samplerOpen }) },
+    { name: 'djkado.ui', partialize: (s) => ({ layout: s.layout, padMode: s.padMode, libraryHeight: s.libraryHeight, libraryOpen: s.libraryOpen, vinylMode: s.vinylMode, waveformZoom: s.waveformZoom, samplerOpen: s.samplerOpen }) },
   ),
 );

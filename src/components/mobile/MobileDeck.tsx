@@ -2,13 +2,13 @@ import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Pause, Play, RefreshCw, Repeat, ChevronLeft, ChevronRight, Music, Layers, Lock } from 'lucide-react';
 import type { DeckId } from '@/audio/engine/types';
-import { HOT_CUE_COLORS } from '@/audio/engine/types';
 import { useDeck } from '@/store/decks';
 import { AudioEngine } from '@/audio/engine/AudioEngine';
 import { deckRuntime, interpolatePos } from '@/store/runtime';
 import { addFrameCallback } from '@/hooks/useAnimationFrame';
 import { formatTime } from '@/audio/dsp/math';
 import { WaveformScroll } from '../waveform/WaveformScroll';
+import { PadGrid } from '../deck/PadGrid';
 import { WaveformOverview } from '../waveform/WaveformOverview';
 import { deckColor } from '../deck/deckTheme';
 import { useStems } from '@/store/stems';
@@ -140,37 +140,8 @@ export function MobileDeck({ id, landscape }: { id: DeckId; landscape?: boolean 
         </motion.button>
       </div>
 
-      {/* hot cues */}
-      <div className="grid grid-cols-4 gap-1.5">
-        {d.hotCues.slice(0, 4).map((c, i) => {
-          const col = c?.color ?? HOT_CUE_COLORS[i];
-          return (
-            <motion.button
-              key={i}
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              className={cn('flex h-9 items-center justify-between rounded-md border px-2 text-[10px] font-black', c ? 'border-transparent' : 'border-border bg-panel-2 text-text-faint')}
-              style={c ? { background: col, color: '#0b0d10' } : { color: col + 'aa' }}
-              disabled={!d.track}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                (e.currentTarget as Element).setPointerCapture(e.pointerId);
-                tap();
-                dk.hotCuePress(i);
-              }}
-              onPointerUp={() => dk.hotCueRelease(i)}
-              onPointerCancel={() => dk.hotCueRelease(i)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                dk.hotCueDelete(i);
-              }}
-            >
-              <span>{i + 1}</span>
-              <span className="font-mono text-[9px] font-normal opacity-80">{c ? formatTime(c.sec) : ''}</span>
-            </motion.button>
-          );
-        })}
-      </div>
+      {/* performance pads (4 on phones) */}
+      <PadGrid id={id} count={4} mobile />
 
       {/* pitch + loop size + shortcuts */}
       <div className="flex items-center gap-1.5">

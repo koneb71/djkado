@@ -14,7 +14,7 @@ import { WaveformScroll } from '../waveform/WaveformScroll';
 import { JogWheel } from '../jog/JogWheel';
 import { Transport } from './Transport';
 import { PitchFader } from './PitchFader';
-import { HotCues } from './HotCues';
+import { PadGrid } from './PadGrid';
 import { LoopControls } from './LoopControls';
 import { FxPanel } from '../fx/FxPanel';
 import { StemsPanel } from './StemsPanel';
@@ -104,7 +104,7 @@ export function DeckView({ id, compact }: { id: DeckId; compact?: boolean }) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-between gap-1.5">
           <Transport id={id} compact={compact} />
-          <HotCues id={id} compact={compact} />
+          <PadGrid id={id} compact={compact} />
           <div className="flex items-center justify-between gap-2">
             <LoopControls id={id} compact={compact} />
             <div className="flex items-center gap-1">

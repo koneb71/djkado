@@ -589,6 +589,57 @@ export class Deck {
       this.applyRate();
     }
   }
+  /* --------------------------------- slicer --------------------------------- */
+  private slicerDomainStart: number | null = null;
+  private slicerHeld: number | null = null;
+  private slicerSlipBefore = false;
+  /** Domain = 8 beats (2 bars) starting at the bar the playhead is in; slice i = beat i of the domain. */
+  slicerDomain(slices = 8): { start: number; sliceLen: number } | null {
+    if (!this.grid) return null;
+    const bl = beatLength(this.grid);
+    const pos = this.position;
+    const domainLen = bl * 8;
+    // domain follows the playhead: 8-beat blocks aligned to the first beat
+    // (before the first beat we still use block 0, so slices never start at negative time)
+    const idx = Math.max(0, Math.floor((pos - this.grid.firstBeatSec) / domainLen));
+    const start = this.grid.firstBeatSec + idx * domainLen;
+    return { start, sliceLen: domainLen / slices };
+  }
+  /** Hold slice i (0..slices-1) of the 8-beat domain: jump + loop that slice with slip so releasing continues where the track would be. */
+  sliceHold(i: number, on: boolean, slices = 8) {
+    if (!this.hasTrack || !this.grid) return;
+    if (on) {
+      const dom = this.slicerDomain(slices);
+      if (!dom) return;
+      if (this.slicerHeld === null) {
+        this.slicerSlipBefore = this.slip;
+        this.slicerDomainStart = dom.start;
+        this.backend.setSlip(true);
+        if (!this.playing) this.play();
+      }
+      const start = (this.slicerDomainStart ?? dom.start) + i * dom.sliceLen;
+      this.slicerHeld = i;
+      this.rolling = true;
+      this.setLoop({ enabled: true, start, end: start + dom.sliceLen, beats: 8 / slices });
+      this.backend.seek(start);
+    } else if (this.slicerHeld === i) {
+      this.slicerHeld = null;
+      this.rolling = false;
+      this.slicerDomainStart = null;
+      this.setLoop({ ...this.loop, enabled: false });
+      this.backend.slipReturn();
+      if (!this.slicerSlipBefore) this.backend.setSlip(false);
+      this.applyRate();
+    }
+  }
+  /** Which slice (0..slices-1) the playhead is currently in, or -1. */
+  currentSlice(slices = 8): number {
+    const dom = this.slicerDomain(slices);
+    if (!dom) return -1;
+    const rel = (this.position - dom.start) / dom.sliceLen;
+    return rel < 0 ? -1 : Math.min(slices - 1, Math.floor(rel));
+  }
+
   beatJump(beats: number) {
     if (!this.hasTrack) return;
     const bl = this.grid ? beatLength(this.grid) : 0.5;

@@ -64,6 +64,7 @@ export const DEFAULT_KEYMAP: KeyBinding[] = [
   { key: 'Digit3', action: 'deck.stems.bass.mute', label: 'Mute bass (focused deck)', shift: true },
   { key: 'Digit4', action: 'deck.stems.other.mute', label: 'Mute other (focused deck)', shift: true },
   { key: 'KeyP', action: 'deck.stems.panel', label: 'Stems panel (focused deck)', shift: true },
+  { key: 'Tab', action: 'deck.padMode.next', label: 'Cycle pad mode (focused deck)' },
 ];
 
 const isTyping = (e: KeyboardEvent) => {

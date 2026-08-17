@@ -5,6 +5,7 @@ import { useUi } from '@/store/ui';
 import { useLibrary } from '@/store/library';
 import { useSampler } from '../engine/Sampler';
 import { useStems } from '@/store/stems';
+import { ROLL_SIZES, JUMP_SIZES } from '@/components/deck/padSizes';
 
 /**
  * Central action registry. Both keyboard shortcuts and MIDI mappings dispatch through here so
@@ -23,7 +24,9 @@ export type ActionId =
   | 'deck.stems.toggle' | 'deck.stems.prepare' | 'deck.stems.panel'
   | 'deck.stems.vocals.mute' | 'deck.stems.drums.mute' | 'deck.stems.bass.mute' | 'deck.stems.other.mute'
   | 'deck.stems.vocals.solo' | 'deck.stems.drums.solo' | 'deck.stems.bass.solo' | 'deck.stems.other.solo'
-  | 'deck.stems.vocals.level' | 'deck.stems.drums.level' | 'deck.stems.bass.level' | 'deck.stems.other.level';
+  | 'deck.stems.vocals.level' | 'deck.stems.drums.level' | 'deck.stems.bass.level' | 'deck.stems.other.level'
+  | 'deck.pad.1' | 'deck.pad.2' | 'deck.pad.3' | 'deck.pad.4' | 'deck.pad.5' | 'deck.pad.6' | 'deck.pad.7' | 'deck.pad.8'
+  | 'deck.padMode.hotcue' | 'deck.padMode.roll' | 'deck.padMode.slicer' | 'deck.padMode.beatjump' | 'deck.padMode.next';
 
 export const ACTION_LABELS: Partial<Record<ActionId, string>> = {
   'deck.play': 'Play / Pause', 'deck.cue': 'Cue', 'deck.cuePlay': 'Cue + Play', 'deck.sync': 'Sync', 'deck.keylock': 'Key lock', 'deck.slip': 'Slip', 'deck.quantize': 'Quantize',
@@ -35,6 +38,7 @@ export const ACTION_LABELS: Partial<Record<ActionId, string>> = {
   'deck.stems.vocals.mute': 'Mute vocals', 'deck.stems.drums.mute': 'Mute drums', 'deck.stems.bass.mute': 'Mute bass', 'deck.stems.other.mute': 'Mute other',
   'deck.stems.vocals.solo': 'Solo vocals', 'deck.stems.drums.solo': 'Solo drums', 'deck.stems.bass.solo': 'Solo bass', 'deck.stems.other.solo': 'Solo other',
   'deck.stems.vocals.level': 'Vocals level', 'deck.stems.drums.level': 'Drums level', 'deck.stems.bass.level': 'Bass level', 'deck.stems.other.level': 'Other level',
+  'deck.padMode.hotcue': 'Pads: hot cue', 'deck.padMode.roll': 'Pads: roll', 'deck.padMode.slicer': 'Pads: slicer', 'deck.padMode.beatjump': 'Pads: beat jump', 'deck.padMode.next': 'Pads: next mode',
   'browser.up': 'Browse up', 'browser.down': 'Browse down', 'browser.loadFocused': 'Load to focused deck', 'ui.layout': 'Toggle 2/4 decks', 'ui.sampler': 'Toggle sampler', 'ui.library': 'Toggle library', 'record.toggle': 'Record',
 };
 
@@ -47,6 +51,8 @@ export interface ActionContext {
 const HOTCUE_RE = /^deck\.hotcue\.(\d)$/;
 const STEM_RE = /^deck\.stems\.(vocals|drums|bass|other)\.(mute|solo|level)$/;
 const SAMPLER_RE = /^sampler\.(\d)$/;
+const PAD_RE = /^deck\.pad\.(\d)$/;
+const PADMODE_RE = /^deck\.padMode\.(hotcue|roll|slicer|beatjump|next)$/;
 
 export function performAction(action: ActionId, value: number, ctx: ActionContext = {}) {
   const deckId = ctx.deck ?? useUi.getState().focusedDeck;
@@ -59,6 +65,27 @@ export function performAction(action: ActionId, value: number, ctx: ActionContex
     const i = Number(hc[1]) - 1;
     if (pressed) dk.hotCuePress(i);
     else dk.hotCueRelease(i);
+    return;
+  }
+  const pad = PAD_RE.exec(action);
+  if (pad) {
+    const i = Number(pad[1]) - 1;
+    const mode = useUi.getState().padMode[deckId];
+    if (mode === 'hotcue') {
+      if (pressed) dk.hotCuePress(i);
+      else dk.hotCueRelease(i);
+    } else if (mode === 'roll') dk.loopRoll(ROLL_SIZES[i], pressed);
+    else if (mode === 'slicer') dk.sliceHold(i, pressed);
+    else if (pressed) dk.beatJump(JUMP_SIZES[i]);
+    return;
+  }
+  const pm = PADMODE_RE.exec(action);
+  if (pm) {
+    if (!pressed) return;
+    const modes = ['hotcue', 'roll', 'slicer', 'beatjump'] as const;
+    const cur = useUi.getState().padMode[deckId];
+    const next = pm[1] === 'next' ? modes[(modes.indexOf(cur) + 1) % modes.length] : (pm[1] as (typeof modes)[number]);
+    useUi.getState().setPadMode(deckId, next);
     return;
   }
   const sm = STEM_RE.exec(action);
