@@ -1,7 +1,8 @@
 import { useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'motion/react';
-import { Music, Radio, ArrowUpDown } from 'lucide-react';
+import { Music, Radio, ArrowUpDown, Layers } from 'lucide-react';
+import { useStems } from '@/store/stems';
 import type { TrackRef } from '@/services/tracks/TrackRef';
 import { isStreamTrack } from '@/services/tracks/TrackRef';
 import { useLibrary } from '@/store/library';
@@ -30,6 +31,7 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
   const layout = useUi((s) => s.layout);
   const decks = useDecks((s) => s.decks);
   const masterKey = decks[focusedDeck]?.key || '';
+  const stemsReady = useStems((s) => s.ready);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -114,6 +116,7 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate font-medium text-text">{t.meta.title}</span>
                   {stream && <Radio size={10} className="shrink-0 text-warn" />}
+                  {stemsReady[t.meta.id] && <Layers size={10} className="shrink-0 text-[#f472b6]" aria-label="Stems ready" />}
                 </div>
                 <span className="truncate text-text-dim">{t.meta.artist}</span>
                 <span className="text-right font-mono tabular text-text-dim">{t.meta.bpm ? t.meta.bpm.toFixed(1) : '—'}</span>

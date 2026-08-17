@@ -13,6 +13,7 @@ import { SamplerPanel } from '../sampler/SamplerPanel';
 import { useMidi } from '@/audio/midi/MidiManager';
 import { useUi } from '@/store/ui';
 import { useDesktop } from '@/desktop/useDesktop';
+import { StemsQueue } from '@/audio/stems/StemsQueue';
 
 export function AppShell() {
   const unlocked = useAudioUnlocked();
@@ -24,6 +25,7 @@ export function AppShell() {
 
   useEffect(() => {
     document.title = 'DJKado';
+    void StemsQueue.probe();
   }, []);
 
   return (

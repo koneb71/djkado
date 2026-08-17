@@ -100,3 +100,40 @@ describe('deck-player-core', () => {
     expect(20 * Math.log10(rmsErr)).toBeLessThan(-60);
   });
 });
+
+describe('stems mixing', () => {
+  const mk16 = (n: number, val: number) => {
+    const a = new Int16Array(n);
+    a.fill(Math.round(val * 32767));
+    return a;
+  };
+  it('mixes weighted stems and honours mutes with smoothing', () => {
+    const s = mkState(20000);
+    // constant stems: 0.1, 0.2, 0.3, 0.4 → sum 1.0
+    s.stems = { channels: [0.1, 0.2, 0.3, 0.4].map((v) => [mk16(20000, v), mk16(20000, v)]), scale: [1, 1, 1, 1] };
+    s.stemsActive = true;
+    s.stemGain.set([1, 1, 1, 1]);
+    s.stemTarget.set([1, 1, 1, 1]);
+    const o = out(64);
+    renderBlock(s, new Float32Array([1]), o, 64, 48000);
+    expect(o[0][10]).toBeCloseTo(1.0, 3);
+    // mute vocals (stem 0): target 0, gain smooths toward 0
+    s.stemTarget[0] = 0;
+    const o2 = out(4096);
+    renderBlock(s, new Float32Array([1]), o2, 4096, 48000);
+    expect(o2[0][0]).toBeGreaterThan(0.95); // still near 1 right after
+    expect(o2[0][4095]).toBeCloseTo(0.9, 2); // converged to 0.9
+    // no clicks: max sample-to-sample delta small
+    let maxD = 0;
+    for (let i = 1; i < 4096; i++) maxD = Math.max(maxD, Math.abs(o2[0][i] - o2[0][i - 1]));
+    expect(maxD).toBeLessThan(0.002);
+  });
+  it('falls back to the mix when stems inactive', () => {
+    const s = mkState(100);
+    s.stems = { channels: [[mk16(100, 0.5), mk16(100, 0.5)]], scale: [1] };
+    s.stemsActive = false;
+    const o = out(4);
+    renderBlock(s, new Float32Array([1]), o, 4, 48000);
+    expect(o[0][1]).toBeCloseTo(1, 4); // ramp source value at index 1
+  });
+});

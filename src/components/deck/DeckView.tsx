@@ -17,6 +17,9 @@ import { PitchFader } from './PitchFader';
 import { HotCues } from './HotCues';
 import { LoopControls } from './LoopControls';
 import { FxPanel } from '../fx/FxPanel';
+import { StemsPanel } from './StemsPanel';
+import { useStems } from '@/store/stems';
+import { Layers } from 'lucide-react';
 import { Button } from '@/ui/Button';
 import { deckColor } from './deckTheme';
 import { cn } from '@/ui/cn';
@@ -26,6 +29,9 @@ export function DeckView({ id, compact }: { id: DeckId; compact?: boolean }) {
   const color = deckColor(id);
   const fxOpen = useUi((s) => s.fxOpen[id]);
   const toggleFx = useUi((s) => s.toggleFx);
+  const stemsOpen = useUi((s) => s.stemsOpen[id]);
+  const toggleStems = useUi((s) => s.toggleStems);
+  const stemsState = useStems((s) => s.decks[id]);
   const focused = useUi((s) => s.focusedDeck === id);
   const setFocused = useUi((s) => s.setFocusedDeck);
   const [dragOver, setDragOver] = useState(false);
@@ -101,9 +107,14 @@ export function DeckView({ id, compact }: { id: DeckId; compact?: boolean }) {
           <HotCues id={id} compact={compact} />
           <div className="flex items-center justify-between gap-2">
             <LoopControls id={id} compact={compact} />
-            <Button size={compact ? 'xs' : 'sm'} active={fxOpen} activeColor={color} onClick={() => toggleFx(id)} disabled={!d.capabilities.fx}>
-              FX
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button size={compact ? 'xs' : 'sm'} active={stemsOpen || stemsState.active} activeColor={stemsState.active ? '#f472b6' : color} onClick={() => toggleStems(id)} disabled={!d.capabilities.stems} title="Stems">
+                <Layers size={12} /> {compact ? '' : 'Stems'}
+              </Button>
+              <Button size={compact ? 'xs' : 'sm'} active={fxOpen} activeColor={color} onClick={() => toggleFx(id)} disabled={!d.capabilities.fx}>
+                FX
+              </Button>
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 items-center">
@@ -111,6 +122,17 @@ export function DeckView({ id, compact }: { id: DeckId; compact?: boolean }) {
         </div>
       </div>
       <AnimatePresence initial={false}>
+        {stemsOpen && (
+          <motion.div key="stems" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 320, damping: 30 }} className="absolute inset-x-2 bottom-2 z-20 rounded-lg border border-border bg-panel/95 p-2 shadow-2xl backdrop-blur-md" style={{ boxShadow: `0 -8px 30px rgba(0,0,0,0.6), 0 0 0 1px ${color}33` }}>
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-text-faint">Stems · Deck {id}</span>
+              <button type="button" onClick={() => toggleStems(id)} className="text-[10px] uppercase tracking-wider text-text-dim hover:text-text">
+                Close
+              </button>
+            </div>
+            <StemsPanel id={id} />
+          </motion.div>
+        )}
         {fxOpen && (
           <motion.div key="fx" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 320, damping: 30 }} className="absolute inset-x-2 bottom-2 z-20 rounded-lg border border-border bg-panel/95 p-2 shadow-2xl backdrop-blur-md" style={{ boxShadow: `0 -8px 30px rgba(0,0,0,0.6), 0 0 0 1px ${color}33` }}>
             <div className="flex items-center justify-between px-1 pb-1">

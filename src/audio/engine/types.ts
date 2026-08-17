@@ -79,6 +79,7 @@ export interface DeckCapabilities {
   sync: boolean;
   keylock: boolean;
   reverse: boolean;
+  stems: boolean;
 }
 
 export const FULL_CAPS: DeckCapabilities = {
@@ -92,6 +93,7 @@ export const FULL_CAPS: DeckCapabilities = {
   sync: true,
   keylock: true,
   reverse: true,
+  stems: true,
 };
 
 export const STREAM_CAPS: DeckCapabilities = {
@@ -105,6 +107,7 @@ export const STREAM_CAPS: DeckCapabilities = {
   sync: false,
   keylock: false,
   reverse: false,
+  stems: false,
 };
 
 export const HOT_CUE_COLORS = ['#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7', '#ec4899', '#ef4444'];

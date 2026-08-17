@@ -1,7 +1,7 @@
 {
   "name": "djkado",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "DJKado \u2014 a VirtualDJ-style browser DJ app with a hybrid local/streaming engine",
   "scripts": {
@@ -52,6 +52,7 @@
     "lucide-react": "^0.468.0",
     "motion": "^11.15.0",
     "music-metadata": "^10.6.4",
+    "onnxruntime-web": "^1.27.0",
     "prettier": "^3.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -4,6 +4,7 @@ import { useMixer } from '@/store/mixer';
 import { useUi } from '@/store/ui';
 import { useLibrary } from '@/store/library';
 import { useSampler } from '../engine/Sampler';
+import { useStems } from '@/store/stems';
 
 /**
  * Central action registry. Both keyboard shortcuts and MIDI mappings dispatch through here so
@@ -18,7 +19,11 @@ export type ActionId =
   | 'mixer.fader' | 'mixer.gain' | 'mixer.high' | 'mixer.mid' | 'mixer.low' | 'mixer.filter' | 'mixer.cue' | 'mixer.crossfader' | 'mixer.master'
   | 'browser.up' | 'browser.down' | 'browser.loadFocused'
   | 'sampler.1' | 'sampler.2' | 'sampler.3' | 'sampler.4' | 'sampler.5' | 'sampler.6' | 'sampler.7' | 'sampler.8'
-  | 'ui.layout' | 'ui.sampler' | 'ui.library' | 'record.toggle';
+  | 'ui.layout' | 'ui.sampler' | 'ui.library' | 'record.toggle'
+  | 'deck.stems.toggle' | 'deck.stems.prepare' | 'deck.stems.panel'
+  | 'deck.stems.vocals.mute' | 'deck.stems.drums.mute' | 'deck.stems.bass.mute' | 'deck.stems.other.mute'
+  | 'deck.stems.vocals.solo' | 'deck.stems.drums.solo' | 'deck.stems.bass.solo' | 'deck.stems.other.solo'
+  | 'deck.stems.vocals.level' | 'deck.stems.drums.level' | 'deck.stems.bass.level' | 'deck.stems.other.level';
 
 export const ACTION_LABELS: Partial<Record<ActionId, string>> = {
   'deck.play': 'Play / Pause', 'deck.cue': 'Cue', 'deck.cuePlay': 'Cue + Play', 'deck.sync': 'Sync', 'deck.keylock': 'Key lock', 'deck.slip': 'Slip', 'deck.quantize': 'Quantize',
@@ -26,6 +31,10 @@ export const ACTION_LABELS: Partial<Record<ActionId, string>> = {
   'deck.beatjump.back': 'Beat jump ←', 'deck.beatjump.fwd': 'Beat jump →', 'deck.pitch': 'Pitch fader', 'deck.pitch.up': 'Pitch +', 'deck.pitch.down': 'Pitch −', 'deck.bend.up': 'Bend +', 'deck.bend.down': 'Bend −',
   'deck.jog': 'Jog wheel', 'deck.jogTouch': 'Jog touch', 'deck.brake': 'Brake', 'deck.backspin': 'Backspin', 'deck.censor': 'Censor', 'deck.reverse': 'Reverse', 'deck.load': 'Load selected', 'deck.eject': 'Eject', 'deck.fx.toggle': 'FX panel',
   'mixer.fader': 'Channel fader', 'mixer.gain': 'Gain', 'mixer.high': 'EQ high', 'mixer.mid': 'EQ mid', 'mixer.low': 'EQ low', 'mixer.filter': 'Filter', 'mixer.cue': 'Headphone cue', 'mixer.crossfader': 'Crossfader', 'mixer.master': 'Master volume',
+  'deck.stems.toggle': 'Stems on/off', 'deck.stems.prepare': 'Prepare stems', 'deck.stems.panel': 'Stems panel',
+  'deck.stems.vocals.mute': 'Mute vocals', 'deck.stems.drums.mute': 'Mute drums', 'deck.stems.bass.mute': 'Mute bass', 'deck.stems.other.mute': 'Mute other',
+  'deck.stems.vocals.solo': 'Solo vocals', 'deck.stems.drums.solo': 'Solo drums', 'deck.stems.bass.solo': 'Solo bass', 'deck.stems.other.solo': 'Solo other',
+  'deck.stems.vocals.level': 'Vocals level', 'deck.stems.drums.level': 'Drums level', 'deck.stems.bass.level': 'Bass level', 'deck.stems.other.level': 'Other level',
   'browser.up': 'Browse up', 'browser.down': 'Browse down', 'browser.loadFocused': 'Load to focused deck', 'ui.layout': 'Toggle 2/4 decks', 'ui.sampler': 'Toggle sampler', 'ui.library': 'Toggle library', 'record.toggle': 'Record',
 };
 
@@ -36,6 +45,7 @@ export interface ActionContext {
 }
 
 const HOTCUE_RE = /^deck\.hotcue\.(\d)$/;
+const STEM_RE = /^deck\.stems\.(vocals|drums|bass|other)\.(mute|solo|level)$/;
 const SAMPLER_RE = /^sampler\.(\d)$/;
 
 export function performAction(action: ActionId, value: number, ctx: ActionContext = {}) {
@@ -49,6 +59,16 @@ export function performAction(action: ActionId, value: number, ctx: ActionContex
     const i = Number(hc[1]) - 1;
     if (pressed) dk.hotCuePress(i);
     else dk.hotCueRelease(i);
+    return;
+  }
+  const sm = STEM_RE.exec(action);
+  if (sm) {
+    const name = sm[1] as 'vocals' | 'drums' | 'bass' | 'other';
+    if (sm[2] === 'level') dk.setStemGain(name, value);
+    else if (pressed) {
+      if (sm[2] === 'mute') dk.toggleStemMute(name);
+      else dk.toggleStemSolo(name);
+    }
     return;
   }
   const sp = SAMPLER_RE.exec(action);
@@ -110,6 +130,9 @@ export function performAction(action: ActionId, value: number, ctx: ActionContex
     case 'ui.sampler': if (pressed) useUi.getState().setSamplerOpen(!useUi.getState().samplerOpen); break;
     case 'ui.library': if (pressed) useUi.getState().setLibraryOpen(!useUi.getState().libraryOpen); break;
     case 'record.toggle': if (pressed) AudioEngine.recorder.toggle(); break;
+    case 'deck.stems.toggle': if (pressed) dk.setStemsActive(!useStems.getState().decks[deckId].active); break;
+    case 'deck.stems.prepare': if (pressed) void dk.prepareStems('high'); break;
+    case 'deck.stems.panel': if (pressed) useUi.getState().toggleStems(deckId); break;
   }
 }
 

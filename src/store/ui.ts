@@ -9,6 +9,7 @@ interface UiState {
   libraryHeight: number;
   libraryOpen: boolean;
   fxOpen: Record<DeckId, boolean>;
+  stemsOpen: Record<DeckId, boolean>;
   samplerOpen: boolean;
   settingsOpen: boolean;
   keyboardHelpOpen: boolean;
@@ -19,6 +20,7 @@ interface UiState {
   setLibraryHeight: (h: number) => void;
   setLibraryOpen: (b: boolean) => void;
   toggleFx: (id: DeckId) => void;
+  toggleStems: (id: DeckId) => void;
   setSamplerOpen: (b: boolean) => void;
   setSettingsOpen: (b: boolean) => void;
   setKeyboardHelpOpen: (b: boolean) => void;
@@ -34,6 +36,7 @@ export const useUi = create<UiState>()(
       libraryHeight: 300,
       libraryOpen: true,
       fxOpen: { A: false, B: false, C: false, D: false },
+      stemsOpen: { A: false, B: false, C: false, D: false },
       samplerOpen: false,
       settingsOpen: false,
       keyboardHelpOpen: false,
@@ -43,7 +46,8 @@ export const useUi = create<UiState>()(
       setLayout: (layout) => set({ layout }),
       setLibraryHeight: (libraryHeight) => set({ libraryHeight: Math.max(160, Math.min(700, libraryHeight)) }),
       setLibraryOpen: (libraryOpen) => set({ libraryOpen }),
-      toggleFx: (id) => set((s) => ({ fxOpen: { ...s.fxOpen, [id]: !s.fxOpen[id] } })),
+      toggleFx: (id) => set((s) => ({ fxOpen: { ...s.fxOpen, [id]: !s.fxOpen[id] }, stemsOpen: { ...s.stemsOpen, [id]: false } })),
+      toggleStems: (id) => set((s) => ({ stemsOpen: { ...s.stemsOpen, [id]: !s.stemsOpen[id] }, fxOpen: { ...s.fxOpen, [id]: false } })),
       setSamplerOpen: (samplerOpen) => set({ samplerOpen }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
       setKeyboardHelpOpen: (keyboardHelpOpen) => set({ keyboardHelpOpen }),

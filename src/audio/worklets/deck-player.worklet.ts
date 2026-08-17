@@ -46,6 +46,8 @@ class DeckPlayerProcessor extends AudioWorkletProcessor {
         s.playing = false;
         s.ended = false;
         s.loop = { enabled: false, start: 0, end: 0 };
+        s.stems = null;
+        s.stemsActive = false;
         this.pendingSeek = null;
         this.post({ type: 'loaded', length: s.length, sampleRate: s.srcRate });
         this.report(true);
@@ -56,7 +58,34 @@ class DeckPlayerProcessor extends AudioWorkletProcessor {
         s.length = 0;
         s.pos = 0;
         s.playing = false;
+        s.stems = null;
+        s.stemsActive = false;
         break;
+      case 'setStems': {
+        // channels: ArrayBuffer[4][2] (Int16), scale: number[4]; must match current buffer length
+        const chans: ArrayBuffer[][] = msg.channels;
+        const stems = chans.map((pair) => pair.map((b) => new Int16Array(b)));
+        if (stems.length && stems[0][0].length !== s.length) {
+          this.post({ type: 'stemsError', message: `stem length ${stems[0][0].length} ≠ ${s.length}` });
+          break;
+        }
+        s.stems = { channels: stems, scale: msg.scale ?? [1, 1, 1, 1] };
+        this.post({ type: 'stemsSet' });
+        break;
+      }
+      case 'clearStems':
+        s.stems = null;
+        s.stemsActive = false;
+        break;
+      case 'setStemGains': {
+        const g: number[] = msg.gains ?? [1, 1, 1, 1];
+        for (let k = 0; k < 4; k++) s.stemTarget[k] = g[k] ?? 1;
+        if (msg.active !== undefined) {
+          if (msg.active && !s.stemsActive) for (let k = 0; k < 4; k++) s.stemGain[k] = s.stemTarget[k];
+          s.stemsActive = !!msg.active && !!s.stems;
+        }
+        break;
+      }
       case 'play':
         if (s.length > 0) {
           if (s.pos >= s.length) s.pos = 0;

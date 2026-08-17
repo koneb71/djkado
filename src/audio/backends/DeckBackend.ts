@@ -35,6 +35,10 @@ export interface DeckBackend {
   getPosition(): number;
   isPlaying(): boolean;
   subscribe(cb: (e: BackendEvent) => void): () => void;
+  /** Stems (WebAudio only): attach Int16 stems (vocals, drums, bass, other), set gains/active, clear. */
+  setStems?(data: { stems: Int16Array[][]; scales: number[]; sampleRate: number; length: number }): Promise<void>;
+  setStemGains?(gains: number[], active: boolean): void;
+  clearStems?(): void;
   /** Key lock (master tempo) and key shift in semitones (WebAudio only). */
   setKeylock?(on: boolean): Promise<void> | void;
   setKeyShift?(semitones: number): void;

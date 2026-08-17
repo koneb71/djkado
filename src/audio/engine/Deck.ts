@@ -10,6 +10,9 @@ import { beatLength, nearestBeat, quantize, type BeatGrid, nudgeGridTo, beatInde
 import { getCues, putCues, addHistory } from '@/services/localLibrary/db';
 import { clamp } from '../dsp/math';
 import { useLibrary } from '@/store/library';
+import { StemsQueue, type StemsData } from '../stems/StemsQueue';
+import { STEM_ORDER, type StemName } from '../stems/models';
+import { effectiveStemGains, useStems } from '@/store/stems';
 
 export type DeckEvent = { type: 'loaded' } | { type: 'ejected' } | { type: 'ended' } | { type: 'play' } | { type: 'pause' };
 
@@ -125,6 +128,7 @@ export class Deck {
 
     // stop current
     this.backend.pause();
+    this.backend.clearStems?.();
     this.setLoop({ enabled: false, start: 0, end: 0 });
     this.grid = null;
     this.hotCues = new Array(8).fill(null);
@@ -202,6 +206,14 @@ export class Deck {
       addHistory({ trackId: track.meta.id, meta: track.meta, deck: this.id });
       if (a && track.kind === 'local') useLibrary.getState().updateLocalTrack(track.meta.id, { bpm: a.bpm || track.meta.bpm, key: a.key.camelot || track.meta.key, durationSec: info.duration });
       this.emit({ type: 'loaded' });
+      // stems: attach cached ones (or auto-prepare when enabled), without blocking the load
+      this.resetStemsState();
+      if (this.backend.capabilities.stems) {
+        void StemsQueue.isCached(track.meta.id).then((cached) => {
+          if (abort.signal.aborted || this.trackId !== track.meta.id) return;
+          if (cached || useStems.getState().autoPrepare) void this.prepareStems(cached ? 'high' : 'low');
+        });
+      }
     } catch (e: any) {
       if (e?.name === 'AbortError') return;
       console.error(e);
@@ -212,6 +224,8 @@ export class Deck {
   eject() {
     this.loadAbort?.abort();
     this.backend.pause();
+    this.backend.clearStems?.();
+    this.resetStemsState();
     this.backend.unload();
     this.trackId = null;
     this.grid = null;
@@ -642,6 +656,95 @@ export class Deck {
   }
   static capsFor(track: TrackRef) {
     return isStreamTrack(track) ? STREAM_CAPS : FULL_CAPS;
+  }
+
+  /* ---------------------------------- stems --------------------------------- */
+  private stemsAttachedFor: string | null = null;
+
+  private resetStemsState() {
+    this.stemsAttachedFor = null;
+    useStems.getState().setDeck(this.id, { available: false, active: false });
+  }
+
+  get stemsAvailable() {
+    return !!this.stemsAttachedFor && this.stemsAttachedFor === this.trackId;
+  }
+
+  /** Compute (or fetch cached) stems for the loaded track and attach them to the worklet. */
+  async prepareStems(priority: 'high' | 'low' = 'high'): Promise<boolean> {
+    const track = this.snapshot.track;
+    if (!track || !this.backend.capabilities.stems || !this.backend.setStems) return false;
+    const id = track.meta.id;
+    try {
+      const data: StemsData = await StemsQueue.getOrPrepare(track, priority);
+      if (this.trackId !== id) return false; // track changed meanwhile
+      await this.backend.setStems({ stems: data.stems, scales: data.scales, sampleRate: data.sampleRate, length: data.length });
+      if (this.trackId !== id) return false;
+      this.stemsAttachedFor = id;
+      const st = useStems.getState();
+      st.setDeck(this.id, { available: true });
+      this.pushStemGains();
+      return true;
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') console.warn('prepareStems failed', e);
+      return false;
+    }
+  }
+
+  private pushStemGains() {
+    const d = useStems.getState().decks[this.id];
+    const g = effectiveStemGains(d);
+    this.backend.setStemGains?.(STEM_ORDER.map((n) => g[n]), d.active && this.stemsAvailable);
+  }
+
+  setStemsActive(on: boolean) {
+    if (on && !this.stemsAvailable) {
+      void this.prepareStems('high').then((ok) => ok && this.setStemsActive(true));
+      return;
+    }
+    useStems.getState().setDeck(this.id, { active: on });
+    this.pushStemGains();
+  }
+  setStemGain(name: StemName, v: number) {
+    const st = useStems.getState();
+    st.setDeck(this.id, { gains: { ...st.decks[this.id].gains, [name]: clamp(v, 0, 1) } });
+    if (!st.decks[this.id].active) this.setStemsActive(true);
+    else this.pushStemGains();
+  }
+  toggleStemMute(name: StemName) {
+    const st = useStems.getState();
+    st.setDeck(this.id, { mute: { ...st.decks[this.id].mute, [name]: !st.decks[this.id].mute[name] } });
+    if (!st.decks[this.id].active) this.setStemsActive(true);
+    else this.pushStemGains();
+  }
+  toggleStemSolo(name: StemName) {
+    const st = useStems.getState();
+    st.setDeck(this.id, { solo: { ...st.decks[this.id].solo, [name]: !st.decks[this.id].solo[name] } });
+    if (!st.decks[this.id].active) this.setStemsActive(true);
+    else this.pushStemGains();
+  }
+  stemPreset(p: 'acapella' | 'instrumental' | 'drumless' | 'drums' | 'reset') {
+    const st = useStems.getState();
+    const none = { vocals: false, drums: false, bass: false, other: false };
+    const gains = { vocals: 1, drums: 1, bass: 1, other: 1 };
+    switch (p) {
+      case 'acapella':
+        st.setDeck(this.id, { gains, mute: none, solo: { ...none, vocals: true } });
+        break;
+      case 'instrumental':
+        st.setDeck(this.id, { gains, mute: { ...none, vocals: true }, solo: none });
+        break;
+      case 'drumless':
+        st.setDeck(this.id, { gains, mute: { ...none, drums: true }, solo: none });
+        break;
+      case 'drums':
+        st.setDeck(this.id, { gains, mute: none, solo: { ...none, drums: true } });
+        break;
+      default:
+        st.setDeck(this.id, { gains, mute: none, solo: none });
+    }
+    if (p !== 'reset' && !st.decks[this.id].active) this.setStemsActive(true);
+    else this.pushStemGains();
   }
 
   captureSlice(startSec: number, endSec: number) {

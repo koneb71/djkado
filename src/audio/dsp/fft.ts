@@ -40,6 +40,30 @@ export class FFT {
       re[j] = window ? input[i] * window[i] : input[i];
       im[j] = 0;
     }
+    this.butterflies();
+  }
+
+  /** Inverse FFT of the complex spectrum (re, im); result (time domain, real in this.re) scaled by 1/N. */
+  inverse(re: Float32Array, im: Float32Array): void {
+    const n = this.size;
+    // conj → forward → conj / N
+    for (let i = 0; i < n; i++) {
+      const j = this.rev[i];
+      this.re[j] = re[i];
+      this.im[j] = -im[i];
+    }
+    this.butterflies();
+    const inv = 1 / n;
+    for (let i = 0; i < n; i++) {
+      this.re[i] *= inv;
+      this.im[i] = -this.im[i] * inv;
+    }
+  }
+
+  private butterflies(): void {
+    const n = this.size;
+    const re = this.re;
+    const im = this.im;
     for (let len = 2; len <= n; len <<= 1) {
       const half = len >> 1;
       const step = n / len;

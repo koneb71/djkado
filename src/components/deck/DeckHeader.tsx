@@ -13,6 +13,7 @@ import { StreamBadge } from './StreamBadge';
 import { Tooltip } from '@/ui/Tooltip';
 import { isStreamTrack } from '@/services/tracks/TrackRef';
 import { cn } from '@/ui/cn';
+import { useStems } from '@/store/stems';
 
 export function DeckHeader({ id, compact }: { id: DeckId; compact?: boolean }) {
   const d = useDeck(id);
@@ -20,6 +21,7 @@ export function DeckHeader({ id, compact }: { id: DeckId; compact?: boolean }) {
   const elapsedRef = useRef<HTMLSpanElement>(null);
   const remainRef = useRef<HTMLSpanElement>(null);
   const [showRemain, setShowRemain] = useState(true);
+  const stemsActive = useStems((s) => s.decks[id].active);
 
   useEffect(() => {
     return addFrameCallback(() => {
@@ -62,6 +64,7 @@ export function DeckHeader({ id, compact }: { id: DeckId; compact?: boolean }) {
                 <div className="flex items-center gap-2">
                   <div className={cn('truncate font-semibold', compact ? 'text-xs' : 'text-sm')}>{d.track.meta.title}</div>
                   {isStreamTrack(d.track) && <StreamBadge />}
+                  {stemsActive && <span className="rounded-sm border border-[#f472b6]/50 bg-[#f472b6]/15 px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-wider text-[#f472b6]">Stems</span>}
                 </div>
                 <div className="truncate text-[11px] text-text-dim">{d.track.meta.artist}</div>
               </>

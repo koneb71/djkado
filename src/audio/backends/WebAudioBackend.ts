@@ -3,6 +3,7 @@ import { FULL_CAPS, type LoadedTrackInfo } from '../engine/types';
 import type { TrackRef } from '@/services/tracks/TrackRef';
 import { AnalysisQueue } from '../workers/AnalysisQueue';
 import deckPlayerUrl from '../worklets/deck-player.worklet.ts?worker&url';
+import { resampleTo } from '../stems/resample';
 
 type StretchNode = AudioNode & {
   start: () => void;
@@ -67,6 +68,8 @@ export class WebAudioBackend implements DeckBackend {
   private keylock = false;
   private keyShift = 0; // semitones
   private targetRate = 1;
+  private length = 0; // frames in the worklet
+  private stemsWaiter: { resolve: () => void; reject: (e: Error) => void } | null = null;
 
   constructor(private ctx: AudioContext) {
     this.output = ctx.createGain();
@@ -105,6 +108,17 @@ export class WebAudioBackend implements DeckBackend {
         break;
       case 'loopWrap':
         this.emit({ type: 'loopWrap' });
+        break;
+      case 'loaded':
+        this.length = msg.length;
+        break;
+      case 'stemsSet':
+        this.stemsWaiter?.resolve();
+        this.stemsWaiter = null;
+        break;
+      case 'stemsError':
+        this.stemsWaiter?.reject(new Error(msg.message));
+        this.stemsWaiter = null;
         break;
       case 'capture': {
         const w = this.captureWaiters.get(msg.id);
@@ -170,6 +184,7 @@ export class WebAudioBackend implements DeckBackend {
       d.set(audio.getChannelData(c));
       channels.push(d);
     }
+    this.length = n;
     this.post({ type: 'load', channels: channels.map((c) => c.buffer), sampleRate: audio.sampleRate }, channels.map((c) => c.buffer));
     this.lastPos = 0;
     this.lastCtxTime = this.ctx.currentTime;
@@ -331,6 +346,41 @@ export class WebAudioBackend implements DeckBackend {
     this.subs.add(cb);
     return () => this.subs.delete(cb);
   }
+  /* --------------------------------- stems --------------------------------- */
+  /** Attach stems; resamples to the worklet's rate/length when the source was decoded at a different rate. */
+  async setStems(data: { stems: Int16Array[][]; scales: number[]; sampleRate: number; length: number }): Promise<void> {
+    if (!this.node || !this.trackId) throw new Error('No track loaded');
+    const targetLen = this.length;
+    const needResample = data.length !== targetLen || data.sampleRate !== this.srcRate;
+    const stems: Int16Array[][] = data.stems.map((chs) =>
+      chs.map((ch) => {
+        if (!needResample) return ch.slice(); // copy: the caller may keep its buffers (IDB cache)
+        const f = new Float32Array(ch.length);
+        for (let i = 0; i < ch.length; i++) f[i] = ch[i];
+        const r = resampleTo(f, targetLen);
+        const out = new Int16Array(targetLen);
+        for (let i = 0; i < targetLen; i++) out[i] = Math.max(-32768, Math.min(32767, Math.round(r[i])));
+        return out;
+      }),
+    );
+    await new Promise<void>((resolve, reject) => {
+      this.stemsWaiter = { resolve, reject };
+      this.post({ type: 'setStems', channels: stems.map((chs) => chs.map((c) => c.buffer)), scale: data.scales }, stems.flat().map((c) => c.buffer));
+      setTimeout(() => {
+        if (this.stemsWaiter?.resolve === resolve) {
+          this.stemsWaiter = null;
+          reject(new Error('stems attach timed out'));
+        }
+      }, 5000);
+    });
+  }
+  setStemGains(gains: number[], active: boolean) {
+    this.post({ type: 'setStemGains', gains, active });
+  }
+  clearStems() {
+    this.post({ type: 'clearStems' });
+  }
+
   captureSlice(startSec: number, endSec: number): Promise<AudioBuffer | null> {
     if (!this.node || !this.trackId) return Promise.resolve(null);
     const id = ++this.captureId;

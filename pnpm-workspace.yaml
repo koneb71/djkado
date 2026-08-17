@@ -3,6 +3,7 @@ allowBuilds:
   electron: true
   sharp: true
   electron-winstaller: true
+  protobufjs: true
 onlyBuiltDependencies:
   - esbuild
   - electron

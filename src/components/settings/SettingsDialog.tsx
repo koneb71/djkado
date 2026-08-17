@@ -13,6 +13,7 @@ import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
 import { cn } from '@/ui/cn';
 import type { DeckId } from '@/audio/engine/types';
 import { DesktopSettings } from './DesktopSettings';
+import { StemsSettings } from './StemsSettings';
 import { isDesktop } from '@/desktop/bridge';
 
 function LatencyInfo() {
@@ -116,6 +117,8 @@ export function SettingsDialog() {
             ))}
           </div>
         </section>
+
+        <StemsSettings />
 
         {isDesktop() && <DesktopSettings />}
 

@@ -26,6 +26,7 @@ Open **http://127.0.0.1:5173**, click once to power on the audio engine, then dr
 | **Mixer** | Gain, 3-band EQ with full kill, dual LP/HP filter, faders with VU meters, headphone cue + cue-mix, crossfader (linear / power / cut) with A/B/thru assignment, master limiter + meters |
 | **FX** | 3 insert slots per deck: Echo, Reverb, Flanger, Phaser, Bitcrusher (AudioWorklet), Filter LFO, Gate — beat-synced to the deck's tempo |
 | **Sampler** | 2 banks × 8 pads (one-shot / hold / loop), synthesized starter kit, load your own samples by click or drop |
+| **Stems** | On-device 4-stem separation (vocals / drums / bass / other) with HTDemucs on WebGPU — per-deck stem faders, mute/solo, Acapella / Instrumental / Drumless presets, sample-accurate mixing in the deck worklet, cached in IndexedDB |
 | **Recording** | Master mix to WebM/Opus (or WAV) with one click |
 | **Control** | VirtualDJ-like keyboard map (press `?`), Web MIDI with learn mode, LED feedback hooks |
 | **Library** | Local files & folders (File System Access API, tags + artwork via music-metadata), History, key-compatible track highlighting, virtualized table, drag-to-deck |
@@ -61,6 +62,19 @@ Auth is OAuth 2.0 PKCE (no client secret). Note Spotify's terms restrict DJ-styl
 3. The Hono server (`server/index.ts`) mints the ES256 developer token at `/api/apple/developer-token`; the app then loads MusicKit JS and asks you to authorize.
 
 Full tracks → Stream Deck. Search results also list **30 s previews**, which load into the full engine (waveform, BPM, key, scratch …).
+
+---
+
+## Stems (on-device separation)
+
+Press **STEMS** on a deck → *Prepare stems*. DJKado separates the track into **vocals, drums, bass and other** entirely on your machine using **HTDemucs (Meta's Demucs v4, MIT)** exported to ONNX and run with ONNX Runtime Web:
+
+- **WebGPU** (Chrome / Edge / Electron on macOS & Windows): ~30 s for a 4-minute track. Without WebGPU it falls back to single-threaded WASM (~5 min) — the UI tells you which engine is in use.
+- The 180 MB model (`timcsy/demucs-web-onnx/htdemucs_embedded.onnx`) is downloaded from Hugging Face on first use, sha256-verified and cached in the browser (Settings ▸ Stems lets you pre-download or remove it).
+- Results are cached in IndexedDB (Int16, ~200 MB per 5-min track, oldest evicted) so a track's stems attach instantly next time; a pink layers icon marks tracks with stems in the library.
+- Stems are mixed **inside the deck worklet** at the same fractional playhead as the original, so scratching, loops, slip and sync stay sample-accurate with stems on. Sum of stems ≈ original (measured 39 dB SNR), so "all stems on" is transparent.
+- Controls: 4 stem faders, M/S per stem, presets (Acapella, Instrumental, Drumless, Drums only), `Shift+1..4` mute stems on the focused deck, `Shift+P` opens the panel; MIDI-mappable (`deck.stems.*` actions). Auto-prepare on load is optional (Settings ▸ Stems).
+- Local files and Apple previews only (DRM streams can't be separated). Storage: keep an eye on Settings ▸ Stems ▸ cache.
 
 ---
 
@@ -108,6 +122,7 @@ src/audio/worklets/        deck-player (variable-rate player), bitcrusher; deck-
 src/audio/dsp/             fft, biquad, onset, bpm, beatgrid, key, waveform, gain (+ tests)
 src/audio/workers/         analysis worker (comlink) + priority queue with IndexedDB cache
 src/audio/fx/              FxUnit base + Echo/Reverb/Flanger/Phaser/Bitcrusher/FilterLFO/Gate, FxChain
+src/audio/stems/           HTDemucs pipeline (stft, segmenting), ONNX Runtime Web worker (WebGPU/WASM), model cache, StemsQueue + IndexedDB cache
 src/audio/midi|keyboard/   action registry shared by MIDI learn + keyboard map
 src/services/sources/      MusicSource interface, mock Spotify/Apple, registry with feature flags
 src/services/spotify|appleMusic/  real adapters (PKCE, Web API, MusicKit loader) activated by env

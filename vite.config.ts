@@ -44,10 +44,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Use the extern-wasm ORT build: the "bundle" variant (inlined Emscripten glue) breaks under Vite.
+      'onnxruntime-web/webgpu': fileURLToPath(new URL('./node_modules/onnxruntime-web/dist/ort.webgpu.min.mjs', import.meta.url)),
     },
   },
   worker: {
     format: 'es',
+  },
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
   },
   server: {
     host: '127.0.0.1',

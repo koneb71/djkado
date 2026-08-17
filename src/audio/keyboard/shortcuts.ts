@@ -59,6 +59,11 @@ export const DEFAULT_KEYMAP: KeyBinding[] = [
   { key: 'F7', action: 'sampler.7', label: 'Sampler pad 7' },
   { key: 'F8', action: 'sampler.8', label: 'Sampler pad 8' },
   { key: 'KeyB', action: 'record.toggle', label: 'Record', shift: true },
+  { key: 'Digit1', action: 'deck.stems.vocals.mute', label: 'Mute vocals (focused deck)', shift: true },
+  { key: 'Digit2', action: 'deck.stems.drums.mute', label: 'Mute drums (focused deck)', shift: true },
+  { key: 'Digit3', action: 'deck.stems.bass.mute', label: 'Mute bass (focused deck)', shift: true },
+  { key: 'Digit4', action: 'deck.stems.other.mute', label: 'Mute other (focused deck)', shift: true },
+  { key: 'KeyP', action: 'deck.stems.panel', label: 'Stems panel (focused deck)', shift: true },
 ];
 
 const isTyping = (e: KeyboardEvent) => {
