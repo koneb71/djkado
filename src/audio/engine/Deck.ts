@@ -50,6 +50,7 @@ export class Deck {
   private volumeThrottle = 0;
   private rolling = false;
   private censoring = false;
+  private gridEdited = false; // only user-edited grids are persisted as overrides
 
   constructor(readonly ctx: AudioContext, readonly id: DeckId, masterInput: AudioNode, cueBus: AudioNode) {
     this.strip = new ChannelStrip(ctx, id);
@@ -131,6 +132,7 @@ export class Deck {
     this.backend.clearStems?.();
     this.setLoop({ enabled: false, start: 0, end: 0 });
     this.grid = null;
+    this.gridEdited = false;
     this.hotCues = new Array(8).fill(null);
     this.cuePoint = 0;
     this.trackId = track.meta.id;
@@ -172,6 +174,7 @@ export class Deck {
       const saved = await getCues(track.meta.id);
       if (abort.signal.aborted) return;
       if (a) {
+        if (saved?.gridOverride) this.gridEdited = true;
         this.grid = saved?.gridOverride
           ? { bpm: saved.gridOverride.bpm, firstBeatSec: saved.gridOverride.firstBeatSec }
           : a.bpm > 0
@@ -507,7 +510,7 @@ export class Deck {
   }
   private persistCues() {
     if (!this.trackId) return;
-    putCues({ trackId: this.trackId, hotCues: this.hotCues, cuePoint: this.cuePoint, gridOverride: this.grid ? { bpm: this.grid.bpm, firstBeatSec: this.grid.firstBeatSec } : null });
+    putCues({ trackId: this.trackId, hotCues: this.hotCues, cuePoint: this.cuePoint, gridOverride: this.gridEdited && this.grid ? { bpm: this.grid.bpm, firstBeatSec: this.grid.firstBeatSec } : null });
   }
 
   /* ---------------------------------- loops --------------------------------- */
@@ -614,6 +617,7 @@ export class Deck {
   /* --------------------------------- beatgrid ------------------------------- */
   setGrid(g: BeatGrid | null) {
     this.grid = g;
+    this.gridEdited = true;
     this.patch({ grid: g, bpm: g?.bpm ?? this.snapshot.bpm });
     if (g) this.strip.fx.setTempo(g.bpm * this.baseRate);
     this.persistCues();

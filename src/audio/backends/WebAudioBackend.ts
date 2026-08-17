@@ -194,7 +194,12 @@ export class WebAudioBackend implements DeckBackend {
 
     let analysis = null;
     try {
-      analysis = await AnalysisQueue.analyze(track.meta.id, mono, audio.sampleRate, 'high', (p, s) => onProgress?.(0.2 + p * 0.8, s));
+      // watchdog: never let a stuck/slow analysis block the deck (track stays playable without a grid)
+      analysis = await Promise.race([
+        AnalysisQueue.analyze(track.meta.id, mono, audio.sampleRate, 'high', (p, s) => onProgress?.(0.2 + p * 0.8, s)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 90_000)),
+      ]);
+      if (!analysis) console.warn('analysis timed out — continuing without beatgrid');
     } catch (e) {
       console.warn('analysis failed', e);
     }

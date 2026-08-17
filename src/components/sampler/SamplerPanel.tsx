@@ -12,7 +12,7 @@ import { cn } from '@/ui/cn';
 
 const MODES: PadMode[] = ['oneshot', 'hold', 'loop'];
 
-export function SamplerPanel() {
+export function SamplerPanel({ mobile }: { mobile?: boolean } = {}) {
   const pads = useSampler((s) => s.pads);
   const bank = useSampler((s) => s.bank);
   const setBank = useSampler((s) => s.setBank);
@@ -26,7 +26,7 @@ export function SamplerPanel() {
   const sampler = AudioEngine.sampler;
 
   return (
-    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="panel noise mx-2 mb-2 flex items-center gap-3 px-3 py-2">
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className={cn('panel noise flex gap-3 px-3 py-2', mobile ? 'flex-col' : 'mx-2 mb-2 items-center')}>
       <div className="flex flex-col items-center gap-1">
         <SectionLabel>Sampler</SectionLabel>
         <div className="flex gap-0.5">
@@ -38,7 +38,7 @@ export function SamplerPanel() {
         </div>
         <Knob size={30} value={volume} min={0} max={1} defaultValue={0.9} onChange={setVolume} color="var(--color-deck-c)" label="Vol" format={(v) => `${Math.round(v * 100)}%`} />
       </div>
-      <div className="grid flex-1 grid-cols-8 gap-1.5">
+      <div className={cn('grid flex-1 gap-1.5', mobile ? 'grid-cols-4' : 'grid-cols-8')}>
         {Array.from({ length: PADS_PER_BANK }).map((_, i) => {
           const id = `${bank}-${i}`;
           const p = pads[id];
@@ -68,7 +68,7 @@ export function SamplerPanel() {
                     toast.success(`Loaded ${f.name} to pad ${i + 1}`);
                   }
                 }}
-                className={cn('relative flex h-14 flex-col items-start justify-between rounded-md border p-1.5 text-left outline-none', p.hasSample ? 'border-transparent' : 'border-dashed border-border text-text-faint hover:border-border-2')}
+                className={cn('relative flex flex-col items-start justify-between rounded-md border p-1.5 text-left outline-none', mobile ? 'h-20' : 'h-14', p.hasSample ? 'border-transparent' : 'border-dashed border-border text-text-faint hover:border-border-2')}
                 style={p.hasSample ? { background: `linear-gradient(180deg, ${p.color}${p.playing ? 'ee' : '99'}, ${p.color}${p.playing ? 'bb' : '55'})`, boxShadow: p.playing ? `0 0 16px ${p.color}` : `inset 0 1px 0 rgba(255,255,255,0.2)`, color: '#0b0d10' } : undefined}
               >
                 <span className="text-[10px] font-black">{i + 1}</span>
@@ -101,9 +101,11 @@ export function SamplerPanel() {
         >
           <Upload size={11} /> Load
         </Button>
-        <Button size="xs" variant="ghost" onClick={() => setSamplerOpen(false)}>
-          Hide
-        </Button>
+        {!mobile && (
+          <Button size="xs" variant="ghost" onClick={() => setSamplerOpen(false)}>
+            Hide
+          </Button>
+        )}
       </div>
       <input
         ref={fileInput}

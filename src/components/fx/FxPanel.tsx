@@ -18,7 +18,7 @@ function fmtParam(spec: FxParamSpec, v: number) {
   return spec.max <= 1 ? `${Math.round(v * 100)}%` : v.toFixed(spec.max > 20 ? 0 : 1);
 }
 
-export function FxPanel({ id }: { id: DeckId }) {
+export function FxPanel({ id, mobile }: { id: DeckId; mobile?: boolean }) {
   const slots = useFx((s) => s.decks[id]);
   const setSlot = useFx((s) => s.setSlot);
   const color = deckColor(id);
@@ -35,11 +35,11 @@ export function FxPanel({ id }: { id: DeckId }) {
 
   return (
     <motion.div className="overflow-hidden">
-      <div className="grid grid-cols-3 gap-2">
+      <div className={cn('grid gap-2', mobile ? 'grid-cols-1' : 'grid-cols-3')}>
         {slots.map((slot, i) => {
           const unit = chain.slots[i];
           return (
-            <div key={i} className="panel-inset flex items-center gap-2 px-2 py-1.5">
+            <div key={i} className={cn('panel-inset flex items-center gap-2 px-2 py-1.5', mobile && 'flex-wrap gap-3 py-2')}>
               <div className="flex flex-col gap-1">
                 <select
                   className="h-6 w-[74px] rounded border border-border bg-panel-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text outline-none focus-visible:ring-2 focus-visible:ring-accent"

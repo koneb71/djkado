@@ -59,13 +59,31 @@ export function computeChroma(mono: Float32Array, sampleRate: number, frameSize 
   }
   const frame = new Float32Array(frameSize);
   const nFrames = Math.floor((mono.length - frameSize) / hop);
+  const logMag = new Float32Array(half);
+  const floor = new Float32Array(half);
+  const FLOOR_HALF = 12; // bins each side for the local spectral floor
   for (let i = 0; i < nFrames; i++) {
     frame.set(mono.subarray(i * hop, i * hop + frameSize));
     fft.forward(frame, win);
+    for (let b = 0; b < half; b++) logMag[b] = Math.log1p(Math.hypot(fft.re[b], fft.im[b]));
+    // local floor = moving average of log magnitude (broadband noise from hats/snares lives here)
+    let acc = 0;
+    for (let b = 0; b < Math.min(half, 2 * FLOOR_HALF + 1); b++) acc += logMag[b];
+    for (let b = 0; b < half; b++) {
+      const lo = b - FLOOR_HALF;
+      const hi = b + FLOOR_HALF;
+      if (lo > 0) acc -= logMag[lo - 1];
+      if (hi + 1 < half && b > 0) acc += logMag[hi + 1];
+      const cnt = Math.min(hi, half - 1) - Math.max(lo, 0) + 1;
+      floor[b] = acc / cnt;
+    }
+    // only tonal peaks that stand above the local floor contribute to the chroma
     for (let b = minBin; b <= maxBin; b++) {
-      const mag = Math.hypot(fft.re[b], fft.im[b]);
-      if (mag <= 0) continue;
-      chroma[pcOfBin[b]] += Math.log1p(mag) * Math.max(0, wOfBin[b]);
+      const m = logMag[b];
+      if (m <= logMag[b - 1] || m < logMag[b + 1]) continue; // not a spectral peak
+      const above = m - floor[b];
+      if (above <= 0.15) continue;
+      chroma[pcOfBin[b]] += above * Math.max(0, wOfBin[b]);
     }
   }
   let max = 0;

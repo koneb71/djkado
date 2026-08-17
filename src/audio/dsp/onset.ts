@@ -20,30 +20,48 @@ export interface OnsetResult {
 export function onsetStrength(mono: Float32Array, sampleRate: number, opts: OnsetOptions = {}): OnsetResult {
   const frameSize = opts.frameSize ?? 1024;
   const hop = opts.hopSize ?? 128;
-  const lowW = opts.lowBandWeight ?? 2;
+  const lowW = opts.lowBandWeight ?? 1.5;
   const fft = new FFT(frameSize);
   const win = hannWindow(frameSize);
   const half = frameSize / 2;
   const nFrames = Math.max(0, Math.floor((mono.length - frameSize) / hop) + 1);
-  const oss = new Float32Array(nFrames);
+  const lowF = new Float32Array(nFrames);
+  const highF = new Float32Array(nFrames);
   const prev = new Float32Array(half);
   const cur = new Float32Array(half);
   const frame = new Float32Array(frameSize);
-  const lowBins = Math.max(1, Math.floor((200 / sampleRate) * frameSize));
+  const lowBins = Math.max(2, Math.floor((200 / sampleRate) * frameSize));
 
   for (let f = 0; f < nFrames; f++) {
     frame.set(mono.subarray(f * hop, f * hop + frameSize));
     fft.forward(frame, win);
-    let flux = 0;
+    let fl = 0;
+    let fh = 0;
     for (let b = 1; b < half; b++) {
       const mag = Math.log1p(10 * Math.hypot(fft.re[b], fft.im[b]));
       cur[b] = mag;
       const d = mag - prev[b];
-      if (d > 0) flux += b < lowBins ? d * lowW : d;
+      if (d > 0) {
+        if (b < lowBins) fl += d;
+        else fh += d;
+      }
     }
-    oss[f] = flux;
+    lowF[f] = fl;
+    highF[f] = fh;
     prev.set(cur);
   }
+  // Combine bands after normalising each to unit RMS so a kick (few low bins) is not swamped by
+  // broadband hi-hats (hundreds of bins); the low band gets extra weight since it carries the beat.
+  const rmsOf = (a: Float32Array) => {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * a[i];
+    return Math.sqrt(s / (a.length || 1)) || 1;
+  };
+  const rl = rmsOf(lowF);
+  const rh = rmsOf(highF);
+  const oss = new Float32Array(nFrames);
+  for (let f = 0; f < nFrames; f++) oss[f] = (lowW * lowF[f]) / rl + highF[f] / rh;
+
   // remove local mean (simple high-pass) to emphasise transients
   const meanWin = Math.round((sampleRate / hop) * 0.5); // 0.5 s
   const smoothed = new Float32Array(nFrames);

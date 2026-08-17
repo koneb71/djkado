@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/koneb71/djkado/actions/workflows/ci.yml/badge.svg)](https://github.com/koneb71/djkado/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/koneb71/djkado?include_prereleases)](https://github.com/koneb71/djkado/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-22d3ee.svg)](LICENSE)
 
-A VirtualDJ-style DJ app built with Vite + React 19 + TypeScript, Tailwind v4, Motion (Framer Motion), Zustand and the Web Audio API. Two or four decks, real-time colored waveforms, BPM / key / beat-grid analysis, sync, loops, hot cues, slip, 3-band EQ + filter, an FX rack, sampler, recording, MIDI learn, keyboard shortcuts — with a hybrid engine designed for local files **and** streaming services.
+A VirtualDJ-style DJ app for the browser, desktop (macOS/Windows) and Android, built with Vite + React 19 + TypeScript, Tailwind v4, Motion (Framer Motion), Zustand and the Web Audio API. Two or four decks, real-time colored waveforms, BPM / key / beat-grid analysis, sync, loops, hot cues, slip, 3-band EQ + filter, an FX rack, sampler, recording, MIDI learn, keyboard shortcuts — with a hybrid engine designed for local files **and** streaming services.
 
 ```bash
 pnpm install
@@ -105,6 +105,21 @@ Building on Apple Silicon: the Windows installer is produced with electron-build
 
 ---
 
+## Android app
+
+DJKado runs on Android as a **Capacitor** app (the web app inside a Chromium WebView → AudioWorklet, WASM, IndexedDB all work) with a dedicated **touch / portrait phone layout**: two compact decks (waveform = jog: drag to scrub/scratch), a mini mixer (volume, filter, crossfader), bottom tabs for Library · Mix (EQ / Stems / FX) · Sampler, native status bar & splash, keep-awake while playing, hardware back button, haptics on pads. Landscape shows the two decks side by side; tablets ≥ 1000 px wide get the desktop layout.
+
+```bash
+pnpm android:build     # vite build + cap sync + gradle → android/app/build/outputs/apk/debug/app-debug.apk
+pnpm android:run       # build and run on a connected device/emulator
+pnpm android:open      # open the project in Android Studio
+```
+Requirements: Android Studio (SDK 35+, JDK 21 — set `JAVA_HOME` to Android Studio's JBR if needed). The Release workflow also builds an APK for every `v*` tag (signed when `ANDROID_KEYSTORE_BASE64` / `_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` secrets are set, debug-signed otherwise) and attaches it to the GitHub release; sideload it with "Install unknown apps" enabled.
+
+Notes: local files come in through the system picker (Add files → Android document picker); Stems run on the CPU (WebView has no WebGPU) — expect several minutes per track on a phone; Spotify/Apple Music DRM streams are not available in the WebView.
+
+---
+
 ## Keyboard (press `?` in the app)
 
 `Q/W` play A/B · `A/S` cue · `Z/X` sync · `1-4` / `7-0` hot cues · `E/O` loop · `R/T` `U/I` loop ½/×2 · `D/F` `J/K` bend · `C/V` censor · `G/H` slip · `↑/↓` browse · `Shift+←/→` load to A/B · `Enter` load to focused deck · `Space` play focused · `L` library · `N` 2/4 decks · `M` sampler · `F1–F8` sampler pads · `Shift+B` record. Shift-drag knobs for fine control, double-click to reset, scroll the waveform to zoom.
@@ -115,6 +130,8 @@ Building on Apple Silicon: the Windows installer is produced with electron-build
 
 ```
 electron/                  Electron main (embedded server, menu, updater, permissions), preload bridge, config, window state
+android/                   Capacitor Android project (Gradle; version derives from package.json)
+src/mobile/, src/components/mobile/  phone layout (MobileShell/MobileDeck/MobileMixer), Capacitor glue (status bar, keep-awake, back button, haptics)
 server/                    Hono API (app.ts shared with the desktop app): health, Apple developer token, preview proxy, static renderer
 src/audio/engine/          AudioEngine (singleton), MasterBus, ChannelStrip, Crossfader, Deck, Sampler, Recorder
 src/audio/backends/        DeckBackend contract, WebAudioBackend (worklet), MockStreamBackend

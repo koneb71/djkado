@@ -7,3 +7,10 @@ dist
 coverage
 release
 dist-electron
+android/app/build
+android/.gradle
+android/build
+android/local.properties
+android/capacitor-cordova-android-plugins/build
+assets/
+*.tsbuildinfo

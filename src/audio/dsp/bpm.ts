@@ -44,24 +44,32 @@ export function detectTempo(mono: Float32Array, sampleRate: number, opts: TempoO
   const centered = new Float32Array(n);
   for (let i = 0; i < n; i++) centered[i] = oss[i] - m;
 
-  const ac = new Float32Array(maxLag + 1);
-  for (let lag = minLag; lag <= maxLag; lag++) {
+  // Autocorrelation up to 4× the longest period so harmonic terms never fall back to unsmoothed reads.
+  const acLen = maxLag * 4 + 4;
+  const acRaw = new Float32Array(acLen);
+  for (let lag = Math.max(1, minLag - 1); lag < acLen && lag < n; lag++) {
     let s = 0;
     for (let i = 0; i + lag < n; i++) s += centered[i] * centered[i + lag];
-    ac[lag] = s / (n - lag);
+    acRaw[lag] = s / (n - lag);
   }
-  // normalise
+  // 3-tap smoothing removes integer-lag quantisation bias (a period that is an exact number of frames
+  // would otherwise get a sharper peak than one that straddles two bins)
+  const ac = new Float32Array(acLen);
+  for (let lag = 1; lag < acLen - 1; lag++) ac[lag] = 0.25 * acRaw[lag - 1] + 0.5 * acRaw[lag] + 0.25 * acRaw[lag + 1];
   let acMax = 0;
   for (let lag = minLag; lag <= maxLag; lag++) if (ac[lag] > acMax) acMax = ac[lag];
   if (acMax <= 0) return { bpm: 0, confidence: 0, firstBeatSec: 0, candidates: [] };
 
-  // Enhance with harmonics (comb): score(lag) = ac(lag) + 0.5*ac(2lag) + 0.25*ac(4lag)
+  // Comb score: ac(lag) + 0.5·ac(2lag) + 0.25·ac(4lag), where each harmonic is the max within a small
+  // tolerance window (±1 at 2×, ±2 at 4×) so a slightly non-integer beat period is not penalised.
+  const acWin = (center: number, tol: number) => {
+    let m = 0;
+    for (let l = center - tol; l <= center + tol; l++) if (l > 0 && l < acLen && ac[l] > m) m = ac[l];
+    return m;
+  };
   const scored = new Float32Array(maxLag + 1);
   for (let lag = minLag; lag <= maxLag; lag++) {
-    let s = ac[lag] / acMax;
-    if (lag * 2 <= maxLag) s += 0.5 * (ac[lag * 2] / acMax);
-    else if (lag * 2 < n) s += 0.5 * (autocorrAt(centered, lag * 2) / acMax);
-    if (lag * 4 < n) s += 0.25 * (autocorrAt(centered, lag * 4) / acMax);
+    const s = ac[lag] / acMax + 0.5 * (acWin(lag * 2, 1) / acMax) + 0.25 * (acWin(lag * 4, 2) / acMax);
     const bpm = (60 * fps) / lag;
     const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / priorBpm) / sigma, 2));
     scored[lag] = s * (0.35 + 0.65 * prior);
@@ -76,7 +84,8 @@ export function detectTempo(mono: Float32Array, sampleRate: number, opts: TempoO
   const top = peaks.slice(0, 5);
   if (!top.length) return { bpm: 0, confidence: 0, firstBeatSec: 0, candidates: [] };
 
-  const best = top[0];
+  const ranked = top;
+  const best = ranked[0];
   const refinedLag = best.lag + parabolicPeakOffset(scored, best.lag);
   let bpm = (60 * fps) / refinedLag;
 
@@ -84,7 +93,7 @@ export function detectTempo(mono: Float32Array, sampleRate: number, opts: TempoO
   if (bpm < 70 && bpm * 2 <= maxBpm) bpm *= 2;
   else if (bpm > 180 && bpm / 2 >= minBpm) bpm /= 2;
 
-  const second = top[1]?.score ?? 0;
+  const second = ranked[1]?.score ?? 0;
   const confidence = Math.max(0, Math.min(1, (best.score - second) / (best.score || 1) + 0.35));
 
   // Fine refinement on the OSS (coarse, ±3%), then a joint BPM+phase refinement on a
@@ -100,7 +109,7 @@ export function detectTempo(mono: Float32Array, sampleRate: number, opts: TempoO
     bpm: Math.round(bpm * 100) / 100,
     confidence,
     firstBeatSec: Math.max(0, firstBeatSec),
-    candidates: top.map((p) => ({ bpm: Math.round(((60 * fps) / p.lag) * 100) / 100, score: p.score })),
+    candidates: ranked.map((p) => ({ bpm: Math.round(((60 * fps) / p.lag) * 100) / 100, score: p.score })),
   };
 }
 
@@ -138,12 +147,6 @@ function refineTempo(oss: Float32Array, fps: number, bpm: number, rangeFrac: num
   return best;
 }
 
-function autocorrAt(x: Float32Array, lag: number): number {
-  let s = 0;
-  const n = x.length;
-  for (let i = 0; i + lag < n; i++) s += x[i] * x[i + lag];
-  return s / (n - lag);
-}
 
 /**
  * Find beat phase: correlate a pulse train with the OSS over one period, pick best offset.

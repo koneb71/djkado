@@ -16,8 +16,11 @@ import { deckColor } from '../deck/deckTheme';
 import { DECK_IDS, type DeckId } from '@/audio/engine/types';
 import { cn } from '@/ui/cn';
 import { Skeleton } from '@/ui/Skeleton';
+import { useIsMobile } from '@/mobile/useIsMobile';
+import { useMobileUi } from '@/mobile/store';
 
 const COLS = 'grid-cols-[36px_minmax(180px,2fr)_minmax(120px,1.4fr)_64px_48px_56px_120px]';
+const COLS_MOBILE = 'grid-cols-[34px_minmax(0,1fr)_56px_72px]';
 
 export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[]; loading?: boolean; emptyHint?: string }) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -32,6 +35,9 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
   const decks = useDecks((s) => s.decks);
   const masterKey = decks[focusedDeck]?.key || '';
   const stemsReady = useStems((s) => s.ready);
+  const mobile = useIsMobile();
+  const setMobileTab = useMobileUi((s) => s.setTab);
+  const cols = mobile ? COLS_MOBILE : COLS;
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -52,11 +58,14 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
     return r;
   }, [tracks, search, sortKey, sortDir]);
 
-  const virt = useVirtualizer({ count: rows.length, getScrollElement: () => parentRef.current, estimateSize: () => 34, overscan: 12 });
+  const virt = useVirtualizer({ count: rows.length, getScrollElement: () => parentRef.current, estimateSize: () => (mobile ? 52 : 34), overscan: 12 });
 
-  const loadTo = (t: TrackRef, id: DeckId) => AudioEngine.deck(id).load(t);
+  const loadTo = (t: TrackRef, id: DeckId) => {
+    void AudioEngine.deck(id).load(t);
+    if (mobile) setMobileTab('decks');
+  };
   const loadedIds = new Set(Object.values(decks).map((d) => d.track?.meta.id).filter(Boolean));
-  const visibleDecks = DECK_IDS.slice(0, layout);
+  const visibleDecks = DECK_IDS.slice(0, mobile ? 2 : layout);
 
   const Header = ({ k, label, className }: { k: typeof sortKey; label: string; className?: string }) => (
     <button type="button" onClick={() => setSort(k)} className={cn('flex items-center gap-1 truncate text-left text-[10px] font-semibold uppercase tracking-wider text-text-faint hover:text-text-dim', className)}>
@@ -66,13 +75,13 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={cn('grid items-center gap-2 border-b border-border px-3 py-1.5', COLS)}>
+      <div className={cn('grid items-center gap-2 border-b border-border px-3 py-1.5', cols)}>
         <span />
-        <Header k="title" label="Title" />
-        <Header k="artist" label="Artist" />
-        <Header k="bpm" label="BPM" className="justify-end" />
-        <Header k="key" label="Key" className="justify-end" />
-        <Header k="duration" label="Time" className="justify-end" />
+        <Header k="title" label={mobile ? 'Track' : 'Title'} />
+        {!mobile && <Header k="artist" label="Artist" />}
+        <Header k="bpm" label={mobile ? 'BPM · Key' : 'BPM'} className="justify-end" />
+        {!mobile && <Header k="key" label="Key" className="justify-end" />}
+        {!mobile && <Header k="duration" label="Time" className="justify-end" />}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-text-faint">Load</span>
       </div>
       <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
@@ -106,22 +115,34 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
                 }}
                 onClick={() => select(t.meta.id)}
                 onDoubleClick={() => loadTo(t, focusedDeck)}
-                className={cn('group absolute left-0 top-0 grid w-full cursor-grab items-center gap-2 px-3 text-xs active:cursor-grabbing', COLS, vi.index % 2 ? 'bg-white/[0.015]' : '', isSel ? 'bg-accent/10' : 'hover:bg-white/[0.04]')}
+                className={cn('group absolute left-0 top-0 grid w-full cursor-grab items-center gap-2 px-3 text-xs active:cursor-grabbing', cols, vi.index % 2 ? 'bg-white/[0.015]' : '', isSel ? 'bg-accent/10' : 'hover:bg-white/[0.04]')}
                 style={{ height: vi.size, transform: `translateY(${vi.start}px)` }}
               >
                 <div className="relative h-7 w-7 overflow-hidden rounded bg-panel-3">
                   {t.meta.artworkUrl ? <img src={t.meta.artworkUrl} alt="" className="h-full w-full object-cover" loading="lazy" draggable={false} /> : <Music size={12} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-text-faint" />}
                   {isLoaded && <span className="absolute inset-0 ring-2 ring-inset ring-accent/70" />}
                 </div>
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate font-medium text-text">{t.meta.title}</span>
-                  {stream && <Radio size={10} className="shrink-0 text-warn" />}
-                  {stemsReady[t.meta.id] && <Layers size={10} className="shrink-0 text-[#f472b6]" aria-label="Stems ready" />}
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate font-medium text-text">{t.meta.title}</span>
+                    {stream && <Radio size={10} className="shrink-0 text-warn" />}
+                    {stemsReady[t.meta.id] && <Layers size={10} className="shrink-0 text-[#f472b6]" aria-label="Stems ready" />}
+                  </div>
+                  {mobile && <div className="truncate text-[11px] text-text-dim">{t.meta.artist}{t.meta.durationSec ? ` · ${formatTime(t.meta.durationSec)}` : ''}</div>}
                 </div>
-                <span className="truncate text-text-dim">{t.meta.artist}</span>
-                <span className="text-right font-mono tabular text-text-dim">{t.meta.bpm ? t.meta.bpm.toFixed(1) : '—'}</span>
-                <span className={cn('rounded px-1 text-right font-mono tabular', compat ? 'bg-success/20 text-success' : 'text-text-dim')}>{t.meta.key || '—'}</span>
-                <span className="text-right font-mono tabular text-text-dim">{t.meta.durationSec ? formatTime(t.meta.durationSec) : '—'}</span>
+                {!mobile && <span className="truncate text-text-dim">{t.meta.artist}</span>}
+                {mobile ? (
+                  <div className="text-right font-mono text-[11px] leading-tight tabular text-text-dim">
+                    <div>{t.meta.bpm ? t.meta.bpm.toFixed(1) : '—'}</div>
+                    <div className={cn('inline-block rounded px-1', compat ? 'bg-success/20 text-success' : '')}>{t.meta.key || '—'}</div>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-right font-mono tabular text-text-dim">{t.meta.bpm ? t.meta.bpm.toFixed(1) : '—'}</span>
+                    <span className={cn('rounded px-1 text-right font-mono tabular', compat ? 'bg-success/20 text-success' : 'text-text-dim')}>{t.meta.key || '—'}</span>
+                    <span className="text-right font-mono tabular text-text-dim">{t.meta.durationSec ? formatTime(t.meta.durationSec) : '—'}</span>
+                  </>
+                )}
                 <div className="flex items-center gap-1">
                   {visibleDecks.map((id) => (
                     <motion.button
@@ -132,7 +153,7 @@ export function TrackTable({ tracks, loading, emptyHint }: { tracks: TrackRef[];
                         e.stopPropagation();
                         loadTo(t, id);
                       }}
-                      className="flex h-5 w-6 items-center justify-center rounded border border-border text-[10px] font-black opacity-60 hover:opacity-100 group-hover:opacity-100"
+                      className={cn('flex items-center justify-center rounded border border-border font-black opacity-60 hover:opacity-100 group-hover:opacity-100', mobile ? 'h-9 w-8 text-xs opacity-100' : 'h-5 w-6 text-[10px]')}
                       style={{ color: deckColor(id), borderColor: deckColor(id) + '66' }}
                       title={`Load to deck ${id}`}
                     >

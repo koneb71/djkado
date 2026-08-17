@@ -65,8 +65,49 @@ jobs:
         run: pnpm electron-builder ${{ matrix.args }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  android:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vite build && pnpm cap sync android
+      - name: Restore keystore (optional)
+        shell: bash
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/djkado.keystore"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/djkado.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          fi
+      - name: Build APK (signed release when a keystore is configured, debug otherwise)
+        shell: bash
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          VER=$(node -p "require('../package.json').version")
+          if [ -n "$ANDROID_KEYSTORE_PATH" ]; then
+            ./gradlew assembleRelease -q
+            cp app/build/outputs/apk/release/app-release.apk "../DJKado-$VER-android.apk"
+          else
+            ./gradlew assembleDebug -q
+            cp app/build/outputs/apk/debug/app-debug.apk "../DJKado-$VER-android-debug.apk"
+          fi
+      - name: Upload APK to the release
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: gh release upload "${{ needs.prepare.outputs.tag }}" DJKado-*-android*.apk --repo "$GITHUB_REPOSITORY" --clobber
   finalize:
-    needs: [prepare, build]
+    needs: [prepare, build, android]
     runs-on: ubuntu-latest
     steps:
       - name: Publish release

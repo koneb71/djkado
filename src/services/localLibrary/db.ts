@@ -44,7 +44,7 @@ export interface StoredStems {
   usedAt: number;
 }
 
-export const ANALYSIS_VERSION = 3;
+export const ANALYSIS_VERSION = 5;
 let dbPromise: Promise<IDBPDatabase<DJKadoDB>> | null = null;
 
 export function getDb() {

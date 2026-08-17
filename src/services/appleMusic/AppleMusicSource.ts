@@ -4,15 +4,23 @@ import { getDeveloperToken } from './developerToken';
 import { loadMusicKit } from './musickit';
 import type { TrackRef, TrackMeta } from '@/services/tracks/TrackRef';
 import type { Playlist } from '@/store/library';
+import { Capacitor } from '@capacitor/core';
 
 /** The real adapter activates when the token server answers (APPLE_* env configured). */
 export const appleConfigured = () => localStorage.getItem('djkado.apple.available') === '1';
 
 // Probe the token endpoint once at startup so the registry can pick the real adapter next load.
+// Strict: must be a JSON 200 with a token (SPA fallbacks like Capacitor's local server return 200 HTML for any path).
 if (typeof window !== 'undefined') {
-  fetch('/api/apple/developer-token', { method: 'HEAD' })
-    .then((r) => localStorage.setItem('djkado.apple.available', r.ok ? '1' : '0'))
-    .catch(() => localStorage.setItem('djkado.apple.available', '0'));
+  const isNative = Capacitor.isNativePlatform();
+  if (isNative) localStorage.setItem('djkado.apple.available', '0');
+  else
+    fetch('/api/apple/developer-token', { headers: { Accept: 'application/json' } })
+      .then(async (r) => {
+        const ok = r.ok && (r.headers.get('content-type') ?? '').includes('application/json') && !!(await r.json().catch(() => null))?.token;
+        localStorage.setItem('djkado.apple.available', ok ? '1' : '0');
+      })
+      .catch(() => localStorage.setItem('djkado.apple.available', '0'));
 }
 
 function artwork(a: any, size = 120): string | undefined {

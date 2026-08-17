@@ -7,7 +7,8 @@ import { AudioEngine } from './audio/engine/AudioEngine';
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry: 1 } } });
 
-if (import.meta.env.DEV) (window as any).djkado = { AudioEngine };
+// Debug/automation handle (also useful for power users & tests)
+(window as any).djkado = { AudioEngine };
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -17,7 +17,7 @@ const STEM_COLOR: Record<StemName, string> = { vocals: '#f472b6', drums: '#f59e0
 const fmtMB = (b?: number) => (b ? `${(b / 1048576).toFixed(0)} MB` : '');
 const fmtEta = (s?: number) => (s === undefined ? '' : s < 60 ? `~${Math.ceil(s)} s` : `~${Math.ceil(s / 60)} min`);
 
-export function StemsPanel({ id }: { id: DeckId }) {
+export function StemsPanel({ id, mobile }: { id: DeckId; mobile?: boolean }) {
   const d = useDeck(id);
   const dk = AudioEngine.deck(id);
   const color = deckColor(id);
@@ -44,9 +44,9 @@ export function StemsPanel({ id }: { id: DeckId }) {
   })();
 
   return (
-    <div className="flex items-stretch gap-3">
+    <div className={cn('flex gap-3', mobile ? 'flex-col' : 'items-stretch')}>
       {/* status + prepare */}
-      <div className="flex w-56 shrink-0 flex-col justify-between gap-2">
+      <div className={cn('flex shrink-0 flex-col justify-between gap-2', mobile ? 'w-full' : 'w-56')}>
         <div className="text-[11px] leading-snug">
           {status && (
             <div className={cn('flex items-start gap-1.5', status.tone === 'ok' && 'text-success', status.tone === 'busy' && 'text-text', status.tone === 'err' && 'text-danger', status.tone === 'muted' && 'text-text-dim')}>
@@ -91,18 +91,18 @@ export function StemsPanel({ id }: { id: DeckId }) {
       </div>
 
       {/* faders */}
-      <div className="flex flex-1 items-end justify-around gap-2 border-l border-border pl-3">
+      <div className={cn('flex flex-1 items-end justify-around gap-2', mobile ? 'border-t border-border pt-3' : 'border-l border-border pl-3')}>
         {STEM_ORDER.map((name) => {
           const muted = stems.mute[name] || (anySolo && !stems.solo[name]);
           const c = STEM_COLOR[name];
           return (
             <div key={name} className="flex flex-col items-center gap-1">
-              <Fader value={stems.gains[name]} min={0} max={1} defaultValue={1} onChange={(v) => dk.setStemGain(name, v)} length={72} thickness={30} color={muted ? '#3a4250' : c} disabled={!stems.available} />
+              <Fader value={stems.gains[name]} min={0} max={1} defaultValue={1} onChange={(v) => dk.setStemGain(name, v)} length={mobile ? 120 : 72} thickness={mobile ? 44 : 30} color={muted ? '#3a4250' : c} disabled={!stems.available} />
               <div className="flex gap-0.5">
-                <button type="button" disabled={!stems.available} onClick={() => dk.toggleStemMute(name)} className={cn('h-5 w-5 rounded text-[9px] font-black', stems.mute[name] ? 'bg-danger/80 text-bg' : 'bg-panel-3 text-text-dim hover:text-text', !stems.available && 'opacity-40')}>
+                <button type="button" disabled={!stems.available} onClick={() => dk.toggleStemMute(name)} className={cn('rounded text-[9px] font-black', mobile ? 'h-8 w-8 text-xs' : 'h-5 w-5', stems.mute[name] ? 'bg-danger/80 text-bg' : 'bg-panel-3 text-text-dim hover:text-text', !stems.available && 'opacity-40')}>
                   M
                 </button>
-                <button type="button" disabled={!stems.available} onClick={() => dk.toggleStemSolo(name)} className={cn('h-5 w-5 rounded text-[9px] font-black', stems.solo[name] ? 'text-bg' : 'bg-panel-3 text-text-dim hover:text-text', !stems.available && 'opacity-40')} style={stems.solo[name] ? { background: c } : undefined}>
+                <button type="button" disabled={!stems.available} onClick={() => dk.toggleStemSolo(name)} className={cn('rounded text-[9px] font-black', mobile ? 'h-8 w-8 text-xs' : 'h-5 w-5', stems.solo[name] ? 'text-bg' : 'bg-panel-3 text-text-dim hover:text-text', !stems.available && 'opacity-40')} style={stems.solo[name] ? { background: c } : undefined}>
                   S
                 </button>
               </div>
@@ -115,7 +115,7 @@ export function StemsPanel({ id }: { id: DeckId }) {
       </div>
 
       {/* presets */}
-      <div className="flex shrink-0 flex-col justify-center gap-1 border-l border-border pl-3">
+      <div className={cn('flex shrink-0 gap-1', mobile ? 'flex-wrap border-t border-border pt-3' : 'flex-col justify-center border-l border-border pl-3')}>
         {(
           [
             ['acapella', 'Acapella'],

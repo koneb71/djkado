@@ -1,7 +1,7 @@
 {
   "name": "djkado",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "DJKado \u2014 a VirtualDJ-style browser DJ app with a hybrid local/streaming engine",
   "scripts": {
@@ -20,9 +20,15 @@
     "dist:win": "pnpm build:desktop && electron-builder --win --publish never",
     "dist": "pnpm build:desktop && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --win --publish never",
     "release": "pnpm build:desktop && electron-builder --mac --win --publish always",
-    "icons": "node scripts/gen-icon.mjs"
+    "icons": "node scripts/gen-icon.mjs",
+    "android:sync": "vite build && cap sync android",
+    "android:build": "pnpm android:sync && cd android && ./gradlew assembleDebug -q && ls -la app/build/outputs/apk/debug/",
+    "android:release": "pnpm android:sync && cd android && ./gradlew assembleRelease -q",
+    "android:open": "cap open android",
+    "android:run": "pnpm android:sync && cap run android"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@eslint/js": "^9.17.0",
     "@hono/node-server": "^1.13.7",
     "@tailwindcss/vite": "^4.0.0",
@@ -70,6 +76,13 @@
     "zustand": "^5.0.2"
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "electron-updater": "^6.8.9"
   },
   "main": "dist-electron/main.js",

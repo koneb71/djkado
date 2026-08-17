@@ -11,6 +11,7 @@ import { TrackTable } from './TrackTable';
 import { ConnectCard } from './ConnectCard';
 import { Button } from '@/ui/Button';
 import { cn } from '@/ui/cn';
+import { useIsMobile } from '@/mobile/useIsMobile';
 
 const TABS: { id: SourceId; label: string; icon: React.ReactNode }[] = [
   { id: 'local', label: 'Local', icon: <HardDrive size={12} /> },
@@ -28,7 +29,7 @@ export function LibraryBrowser() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-2 py-1.5">
         <div className="flex items-center gap-0.5 rounded-md bg-bg-elev p-0.5">
           {TABS.map((t) => (
             <button key={t.id} type="button" onClick={() => setSource(t.id)} className={cn('relative flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] font-semibold', source === t.id ? 'text-text' : 'text-text-faint hover:text-text-dim')}>
@@ -39,7 +40,7 @@ export function LibraryBrowser() {
             </button>
           ))}
         </div>
-        <div className="relative ml-1 flex-1 max-w-sm">
+        <div className="relative ml-1 min-w-[160px] flex-1 max-w-sm">
           <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-faint" />
           <input
             value={search}
@@ -128,8 +129,25 @@ function StreamView({ id }: { id: 'spotify' | 'apple' }) {
   });
 
   const rows = useMemo(() => tracksQ.data ?? [], [tracksQ.data]);
+  const mobile = useIsMobile();
 
   if (!ready) return <ConnectCard id={id} />;
+  if (mobile) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ConnectCard id={id} />
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border px-2 py-1.5">
+          {playlists.data?.map((p) => (
+            <button key={p.id} type="button" onClick={() => selectPlaylist(id, p.id)} className={cn('flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs', selected === p.id && !q ? 'border-accent/60 bg-accent/15 text-text' : 'border-border text-text-dim')}>
+              {p.artworkUrl ? <img src={p.artworkUrl} alt="" className="h-4 w-4 rounded object-cover" /> : <ListMusic size={12} className="text-text-faint" />}
+              <span className="max-w-[140px] truncate">{p.name}</span>
+            </button>
+          ))}
+        </div>
+        <TrackTable tracks={rows} loading={tracksQ.isLoading} emptyHint={q ? 'No results' : 'Select a playlist'} />
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ConnectCard id={id} />
