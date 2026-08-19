@@ -10,6 +10,7 @@ import { beatLength, nearestBeat, quantize, type BeatGrid, nudgeGridTo, beatInde
 import { getCues, putCues, addHistory } from '@/services/localLibrary/db';
 import { clamp } from '../dsp/math';
 import { useLibrary } from '@/store/library';
+import { useUi } from '@/store/ui';
 import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
 import { StemsQueue, type StemsData } from '../stems/StemsQueue';
 import { STEM_ORDER, type StemName } from '../stems/models';
@@ -124,6 +125,7 @@ export class Deck {
 
   /* --------------------------------- loading -------------------------------- */
   async load(track: TrackRef): Promise<void> {
+    this.clearMotor();
     this.loadAbort?.abort();
     const abort = new AbortController();
     this.loadAbort = abort;
@@ -273,15 +275,79 @@ export class Deck {
   }
 
   /* -------------------------------- transport ------------------------------- */
-  play() {
+  /** set while the platter is ramping — the motor owns the rate until it finishes */
+  braking = false;
+  /** which way the motor is turning ('down' = stopping) */
+  private motorDir: 'up' | 'down' | null = null;
+  private motorTimer: number | null = null;
+
+  private clearMotor() {
+    if (this.motorTimer !== null) window.clearTimeout(this.motorTimer);
+    this.motorTimer = null;
+    if (this.braking) this.backend.setMotorRamp?.(false);
+    this.braking = false;
+    this.motorDir = null;
+  }
+
+  /** Motor simulation settings; disabled for stream decks, which can't vary their rate. */
+  private motor(): { on: boolean; stop: number; start: number } {
+    const { vinylBrake, brakeSec } = useUi.getState();
+    return { on: vinylBrake && this.backend.capabilities.scratch, stop: brakeSec, start: brakeSec * 0.6 };
+  }
+
+  /**
+   * Start the deck. Like a turntable, the platter spins up to speed unless `instant` is asked for
+   * (cue previews, hot cues and Automix need the audio to be at pitch immediately).
+   */
+  play(opts: { instant?: boolean } = {}) {
     if (!this.hasTrack) return;
+    const m = this.motor();
+    this.clearMotor();
+    if (opts.instant || !m.on) {
+      this.applyRate();
+      this.backend.play();
+      return;
+    }
+    const target = this.baseRate * (1 + this.syncOffset) * (this.reversed ? -1 : 1);
+    this.braking = true;
+    this.motorDir = 'up';
+    this.backend.setMotorRamp?.(true);
+    // /4 rather than /3: the ramp is ~98% there when the timer restores the exact rate
+    const tc = Math.max(0.02, m.start / 4);
+    const fromStandstill = !this.playing;
     this.backend.play();
+    if (fromStandstill && this.backend.rampRateFrom) this.backend.rampRateFrom(0, target, tc);
+    else this.backend.rampRate(target, tc);
+    this.motorTimer = window.setTimeout(() => {
+      this.clearMotor();
+      this.applyRate();
+    }, m.start * 1000);
   }
-  pause() {
-    this.backend.pause();
+
+  /** Stop the deck, braking the platter to a halt first (VirtualDJ-style) unless `instant`. */
+  pause(opts: { instant?: boolean } = {}) {
+    const m = this.motor();
+    if (opts.instant || !m.on || !this.playing) {
+      this.clearMotor();
+      this.backend.pause();
+      this.applyRate();
+      return;
+    }
+    this.clearMotor();
+    this.braking = true;
+    this.motorDir = 'down';
+    this.backend.setMotorRamp?.(true);
+    this.backend.rampRate(0, Math.max(0.02, m.stop / 3));
+    this.motorTimer = window.setTimeout(() => {
+      this.clearMotor();
+      this.backend.pause();
+      this.applyRate();
+    }, m.stop * 1000);
   }
+
   togglePlay() {
-    if (this.playing) this.pause();
+    // pressing the button while the platter spins down winds it back up; while it spins up, stops it
+    if (this.playing && this.motorDir !== 'down') this.pause();
     else this.play();
   }
 
@@ -289,7 +355,7 @@ export class Deck {
   cuePress() {
     if (!this.hasTrack) return;
     if (this.playing && !this.cueHeld) {
-      this.pause();
+      this.pause({ instant: true });
       this.seek(this.cuePoint);
       return;
     }
@@ -302,19 +368,19 @@ export class Deck {
       this.persistCues();
     }
     this.cueHeld = true;
-    this.play();
+    this.play({ instant: true });
   }
   cueRelease() {
     if (!this.cueHeld) return;
     this.cueHeld = false;
-    this.pause();
+    this.pause({ instant: true });
     this.seek(this.cuePoint);
   }
   /** Cue+Play (keep playing from cue point) */
   cuePlay() {
     this.cueHeld = false;
     this.seek(this.cuePoint);
-    this.play();
+    this.play({ instant: true });
   }
 
   seek(sec: number) {
@@ -343,7 +409,8 @@ export class Deck {
     let r = this.baseRate * (1 + this.syncOffset);
     if (this.reversed) r = -r;
     if (this.censoring) r = -Math.abs(r);
-    if (!this.scratching && !this.rolling) this.backend.setRate(r);
+    // the motor owns the rate while the platter spins up or down
+    if (!this.scratching && !this.rolling && !this.braking) this.backend.setRate(r);
     this.backend.setNominalRate(this.baseRate);
     this.strip.fx.setTempo(this.effectiveBpm || 120);
     this.patch({ pitch: this.pitch, pitchRange: this.pitchRange, rate: this.baseRate });
@@ -380,11 +447,11 @@ export class Deck {
     this.syncOffset = o;
     let r = this.baseRate * (1 + o);
     if (this.reversed) r = -r;
-    if (!this.scratching && !this.rolling && !this.censoring) this.backend.setRate(r);
+    if (!this.scratching && !this.rolling && !this.censoring && !this.braking) this.backend.setRate(r);
   }
   /** Temporary pitch bend (buttons / jog outer ring). amount ±1 => ±8% */
   bend(amount: number, ms = 120) {
-    if (this.scratching) return;
+    if (this.scratching || this.braking) return;
     const r = this.baseRate * (1 + amount * 0.08) * (this.reversed ? -1 : 1);
     this.backend.rampRate(r, 0.02);
     const until = performance.now() + ms;
@@ -424,20 +491,22 @@ export class Deck {
   }
   brake(seconds = 0.5) {
     if (!this.playing) return;
+    this.clearMotor();
     this.backend.rampRate(0, seconds / 3);
     setTimeout(() => {
-      this.pause();
+      this.pause({ instant: true });
       this.backend.setRate(this.baseRate * (this.reversed ? -1 : 1));
     }, seconds * 1000);
   }
   backspin(seconds = 0.9) {
     if (!this.hasTrack) return;
     const wasPlaying = this.playing;
-    if (!wasPlaying) this.play();
+    this.clearMotor();
+    if (!wasPlaying) this.play({ instant: true });
     this.backend.setRateAt(-4);
     this.backend.rampRate(0, seconds / 3.5);
     setTimeout(() => {
-      this.pause();
+      this.pause({ instant: true });
       this.backend.setRate(this.baseRate * (this.reversed ? -1 : 1));
     }, seconds * 1000);
   }
@@ -446,6 +515,7 @@ export class Deck {
   /** Vinyl-mode touch. */
   jogTouch(on: boolean) {
     if (!this.backend.capabilities.scratch) return;
+    if (on) this.clearMotor(); // the hand takes over from the motor
     if (on && !this.scratching) {
       this.scratching = true;
       this.backend.scratch(true);
@@ -487,7 +557,7 @@ export class Deck {
         // preview while held (like cue)
         this.cueHeld = true;
         (this as any)._hotCueHeld = i;
-        this.play();
+        this.play({ instant: true }); // a pad stab must be at pitch, not winding up
       }
     } else {
       const sec = quantize(this.grid, this.position, this.quantizeOn);
@@ -501,7 +571,7 @@ export class Deck {
       this.cueHeld = false;
       (this as any)._hotCueHeld = undefined;
       const c = this.hotCues[i];
-      this.pause();
+      this.pause({ instant: true });
       if (c) this.seek(c.sec);
     }
   }
@@ -623,7 +693,7 @@ export class Deck {
         this.slicerSlipBefore = this.slip;
         this.slicerDomainStart = dom.start;
         this.backend.setSlip(true);
-        if (!this.playing) this.play();
+        if (!this.playing) this.play({ instant: true });
       }
       const start = (this.slicerDomainStart ?? dom.start) + i * dom.sliceLen;
       this.slicerHeld = i;

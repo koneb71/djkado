@@ -23,6 +23,10 @@ interface UiState {
   keyboardHelpOpen: boolean;
   focusedDeck: DeckId;
   vinylMode: boolean;
+  /** pause/play ramp the platter down and up like a turntable motor (VirtualDJ-style) */
+  vinylBrake: boolean;
+  /** seconds the platter takes to stop; starting up takes 60% of it */
+  brakeSec: number;
   waveformZoom: number; // seconds visible in the scrolling waveform
   setLayout: (l: Layout) => void;
   setLibraryHeight: (h: number) => void;
@@ -35,6 +39,8 @@ interface UiState {
   setKeyboardHelpOpen: (b: boolean) => void;
   setFocusedDeck: (id: DeckId) => void;
   setVinylMode: (b: boolean) => void;
+  setVinylBrake: (b: boolean) => void;
+  setBrakeSec: (s: number) => void;
   setWaveformZoom: (z: number) => void;
 }
 
@@ -52,6 +58,8 @@ export const useUi = create<UiState>()(
       keyboardHelpOpen: false,
       focusedDeck: 'A',
       vinylMode: true,
+      vinylBrake: true,
+      brakeSec: 0.6,
       waveformZoom: 8,
       setLayout: (layout) => set({ layout }),
       setLibraryHeight: (libraryHeight) => set({ libraryHeight: Math.max(160, Math.min(700, libraryHeight)) }),
@@ -64,8 +72,10 @@ export const useUi = create<UiState>()(
       setKeyboardHelpOpen: (keyboardHelpOpen) => set({ keyboardHelpOpen }),
       setFocusedDeck: (focusedDeck) => set({ focusedDeck }),
       setVinylMode: (vinylMode) => set({ vinylMode }),
+      setVinylBrake: (vinylBrake) => set({ vinylBrake }),
+      setBrakeSec: (brakeSec) => set({ brakeSec: Math.max(0.05, Math.min(3, brakeSec)) }),
       setWaveformZoom: (z) => set({ waveformZoom: Math.max(2, Math.min(40, z)) }),
     }),
-    { name: 'djkado.ui', partialize: (s) => ({ layout: s.layout, padMode: s.padMode, libraryHeight: s.libraryHeight, libraryOpen: s.libraryOpen, vinylMode: s.vinylMode, waveformZoom: s.waveformZoom, samplerOpen: s.samplerOpen }) },
+    { name: 'djkado.ui', partialize: (s) => ({ layout: s.layout, padMode: s.padMode, libraryHeight: s.libraryHeight, libraryOpen: s.libraryOpen, vinylMode: s.vinylMode, vinylBrake: s.vinylBrake, brakeSec: s.brakeSec, waveformZoom: s.waveformZoom, samplerOpen: s.samplerOpen }) },
   ),
 );

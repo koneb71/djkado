@@ -45,6 +45,10 @@ export function SettingsDialog() {
   const setOpen = useUi((s) => s.setSettingsOpen);
   const vinyl = useUi((s) => s.vinylMode);
   const setVinyl = useUi((s) => s.setVinylMode);
+  const vinylBrake = useUi((s) => s.vinylBrake);
+  const setVinylBrake = useUi((s) => s.setVinylBrake);
+  const brakeSec = useUi((s) => s.brakeSec);
+  const setBrakeSec = useUi((s) => s.setBrakeSec);
   const format = useRecorder((s) => s.format);
   const midi = useMidiStore();
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
@@ -162,6 +166,23 @@ export function SettingsDialog() {
           </Row>
           <Row label="Vinyl mode" hint="Platter top scratches; outer ring nudges">
             <Toggle checked={vinyl} onChange={setVinyl} />
+          </Row>
+          <Row label="Motor brake" hint={vinylBrake ? `Pause spins the platter down over ${brakeSec.toFixed(2)}s and play winds it back up` : 'Pause and play stop and start instantly'}>
+            <div className="flex items-center gap-2">
+              {vinylBrake && (
+                <input
+                  type="range"
+                  min={0.1}
+                  max={2}
+                  step={0.05}
+                  value={brakeSec}
+                  onChange={(e) => setBrakeSec(Number(e.target.value))}
+                  className="w-24 accent-[var(--color-accent)]"
+                  aria-label="Brake time"
+                />
+              )}
+              <Toggle checked={vinylBrake} onChange={setVinylBrake} />
+            </div>
           </Row>
           <Row label="Recording format">
             <div className="flex gap-1">

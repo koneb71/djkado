@@ -245,17 +245,33 @@ export class WebAudioBackend implements DeckBackend {
     p.setTargetAtTime(target, this.ctx.currentTime, timeConstant);
     this.noteRate(target);
   }
+  rampRateFrom(from: number, target: number, timeConstant: number) {
+    const p = this.rateParam();
+    if (!p) return;
+    const t = this.ctx.currentTime;
+    // cancel first: scheduling the start value before the cancel would wipe it out again
+    p.cancelScheduledValues(t);
+    p.setValueAtTime(from, t);
+    p.setTargetAtTime(target, t, timeConstant);
+    this.noteRate(target);
+  }
+  setMotorRamp(on: boolean) {
+    this.motorRamp = on;
+    this.updateStretch();
+  }
 
   /* ------------------------------ key lock ------------------------------ */
   private noteRate(rate: number) {
     this.targetRate = rate;
     this.updateStretch();
   }
+  private motorRamp = false;
   private updateStretch() {
     if (!this.stretch) return;
     const r = Math.abs(this.targetRate);
-    // compensate the resampling pitch change while within a musical range; bypass shift when scratching/braking
-    const comp = this.keylock && r > 0.5 && r < 2 ? -12 * Math.log2(r) : 0;
+    // compensate the resampling pitch change while within a musical range; bypass shift when
+    // scratching, braking or spinning up — a stopping turntable is supposed to drop in pitch
+    const comp = this.keylock && !this.motorRamp && r > 0.5 && r < 2 ? -12 * Math.log2(r) : 0;
     this.stretch.schedule({ semitones: comp + this.keyShift });
   }
   /** Master tempo: pitch-shift back by the resampling amount using a live-input stretch node. */

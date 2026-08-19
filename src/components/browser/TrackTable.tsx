@@ -22,6 +22,7 @@ import { cn } from '@/ui/cn';
 import { Skeleton } from '@/ui/Skeleton';
 import { useIsMobile } from '@/mobile/useIsMobile';
 import { useMobileUi } from '@/mobile/store';
+import { tap } from '@/mobile/native';
 
 const COLS = 'grid-cols-[36px_minmax(180px,2fr)_minmax(120px,1.4fr)_64px_48px_56px_178px]';
 const COLS_MOBILE = 'grid-cols-[34px_minmax(0,1fr)_56px_104px]';
@@ -73,6 +74,22 @@ export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: Tr
     void AudioEngine.deck(id).load(t);
     if (mobile) setMobileTab('decks');
   };
+
+  /**
+   * Touch has no double-click, so a tap loads the track — into an empty deck first, otherwise a
+   * paused one. If everything is playing we don't clobber a live deck; the A/B buttons still do.
+   */
+  const tapLoad = (t: TrackRef) => {
+    const idle = (id: DeckId) => !decks[id].playing || AudioEngine.deck(id).braking;
+    const free = visibleDecks.find((id) => !decks[id].track) ?? visibleDecks.find(idle);
+    if (!free) {
+      toast.info(`Deck ${visibleDecks.join(' and ')} are playing — use the deck buttons to choose`, { duration: 2500 });
+      return;
+    }
+    tap();
+    void AudioEngine.deck(free).load(t);
+    toast.success(`${t.meta.title} → deck ${free}`, { duration: 1500 });
+  };
   const loadedIds = new Set(Object.values(decks).map((d) => d.track?.meta.id).filter(Boolean));
   const visibleDecks = DECK_IDS.slice(0, mobile ? 2 : layout);
 
@@ -122,8 +139,13 @@ export function TrackTable({ tracks, loading, emptyHint, crateId }: { tracks: Tr
                   e.dataTransfer.setData(DND_MIME, t.meta.id);
                   e.dataTransfer.effectAllowed = 'copy';
                 }}
-                onClick={() => select(t.meta.id)}
-                onDoubleClick={() => loadTo(t, focusedDeck)}
+                onClick={() => {
+                  select(t.meta.id);
+                  if (mobile) tapLoad(t);
+                }}
+                onDoubleClick={() => {
+                  if (!mobile) loadTo(t, focusedDeck);
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   select(t.meta.id);

@@ -146,7 +146,7 @@ class AutomixImpl {
           this.cueToStart(candidate);
           this.prepared.delete(candidate.id);
           this.setXfTo(candidate.id);
-          candidate.play();
+          candidate.play({ instant: true });
           st._status({ phase: 'idle', liveDeck: candidate.id, nextDeck: null, countdown: null });
         } else {
           // user paused mid-track: wait for them (Skip moves on)
@@ -265,7 +265,7 @@ class AutomixImpl {
       mixer.setChannel(from.id, { fader: 1 });
     }
     this.prepared.delete(to.id);
-    to.play();
+    to.play({ instant: true }); // a beat-matched mix can't start with the platter spinning up
     this.mix = { from: from.id, to: to.id, t0: AudioEngine.ctx.currentTime, dur, useXf, xf0: useXf ? mixer.crossfader : 0, xf1: useXf ? sTo! : 0, synced };
     st._status({ phase: 'mixing', liveDeck: from.id, nextDeck: to.id, progress: 0, countdown: 0 });
   }
@@ -303,7 +303,7 @@ class AutomixImpl {
     if (complete) {
       if (m.useXf) mixer.setCrossfader(m.xf1);
       else mixer.setChannel(m.to, { fader: 1 });
-      from.pause();
+      from.pause({ instant: true });
       this.played.add(m.from);
     }
     // restore EQ / faders on both channels

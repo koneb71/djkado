@@ -31,6 +31,10 @@ export interface DeckBackend {
   scratch(on: boolean): void;
   /** Ramp the rate AudioParam (WebAudio). Others: no-op. */
   rampRate(target: number, timeConstant: number): void;
+  /** ramp starting from an explicit value (rampRate alone cancels a same-instant setValueAtTime) */
+  rampRateFrom?(from: number, target: number, timeConstant: number): void;
+  /** while the motor ramps (platter spin up/down) key lock must not hold the pitch */
+  setMotorRamp?(on: boolean): void;
   setRateAt(rate: number, ctxTime?: number): void;
   getPosition(): number;
   isPlaying(): boolean;

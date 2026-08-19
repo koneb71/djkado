@@ -209,7 +209,7 @@ class AudioEngineImpl {
     const master = this.getMasterDeck();
     if (!master || !master.beatGrid) return;
     for (const d of this.decks) {
-      if (d.id === master.id || !d.snapshot.sync || !d.beatGrid || !d.playing || !master.playing) {
+      if (d.id === master.id || !d.snapshot.sync || !d.beatGrid || !d.playing || !master.playing || d.braking || master.braking) {
         if (d.id !== master.id) d.setSyncOffset(0);
         continue;
       }
