@@ -1,0 +1,31 @@
+# DJKado on Dokploy (Compose service). Differences from docker-compose.yml:
+#   • no host port binding (avoids "port is already allocated"); Traefik reaches the container over dokploy-network
+#   • joined to Dokploy's external `dokploy-network` so the Domains tab can route to it
+# In Dokploy: Compose service → Compose path `docker-compose.dokploy.yml` → deploy → Domains tab:
+#   service `djkado`, container port 51732, HTTPS + Let's Encrypt, host djkado.example.com
+services:
+  djkado:
+    build:
+      context: .
+      args:
+        VITE_SPOTIFY_CLIENT_ID: ${VITE_SPOTIFY_CLIENT_ID:-}
+        VITE_SPOTIFY_REDIRECT_URI: ${VITE_SPOTIFY_REDIRECT_URI:-}
+    restart: unless-stopped
+    expose:
+      - "51732"
+    environment:
+      PORT: 51732
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:51732/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+
+networks:
+  dokploy-network:
+    external: true
