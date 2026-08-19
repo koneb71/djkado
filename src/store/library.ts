@@ -23,6 +23,8 @@ interface LibraryState {
   selectedTrackId: string | null;
   /** tracks stored from an earlier session whose files can no longer be opened (web only) */
   unavailableTracks: number;
+  /** selected folder in the Local browser (null = whole library) */
+  folderPath: string | null;
   sortKey: 'title' | 'artist' | 'bpm' | 'key' | 'duration' | 'added';
   sortDir: 'asc' | 'desc';
   setSource: (s: SourceId) => void;
@@ -41,6 +43,7 @@ interface LibraryState {
   select: (id: string | null) => void;
   setSort: (k: LibraryState['sortKey']) => void;
   setUnavailable: (n: number) => void;
+  setFolderPath: (p: string | null) => void;
 }
 
 export const useLibrary = create<LibraryState>((set) => ({
@@ -54,6 +57,7 @@ export const useLibrary = create<LibraryState>((set) => ({
   scanning: { active: false, done: 0, total: 0 },
   selectedTrackId: null,
   unavailableTracks: 0,
+  folderPath: null,
   sortKey: 'added',
   sortDir: 'desc',
   setSource: (source) => set({ source }),
@@ -76,5 +80,6 @@ export const useLibrary = create<LibraryState>((set) => ({
   setScanning: (p) => set((s) => ({ scanning: { ...s.scanning, ...p } })),
   select: (selectedTrackId) => set({ selectedTrackId }),
   setUnavailable: (unavailableTracks) => set({ unavailableTracks }),
+  setFolderPath: (folderPath) => set({ folderPath }),
   setSort: (k) => set((s) => ({ sortKey: k, sortDir: s.sortKey === k ? (s.sortDir === 'asc' ? 'desc' : 'asc') : 'asc' })),
 }));

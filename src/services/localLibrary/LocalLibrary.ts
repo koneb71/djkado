@@ -112,22 +112,44 @@ async function mergeCachedAnalysis(refs: TrackRef[]) {
   await putStoredTracks(updated);
 }
 
+/** "Music/House/track.mp3" → "Music/House" (undefined when the file has no folder context). */
+export function folderFromRelativePath(relativePath?: string): string | undefined {
+  if (!relativePath) return undefined;
+  const clean = relativePath.replace(/^\/+/, '');
+  const i = clean.lastIndexOf('/');
+  return i > 0 ? clean.slice(0, i) : undefined;
+}
+
 export const LocalLibrary = {
-  /** Add File objects to the library; tags parsed in the background. */
-  async addFiles(files: File[]): Promise<TrackRef[]> {
+  /**
+   * Add File objects to the library; tags parsed in the background.
+   * `folderOf` supplies the display folder for each file (directory walk, drop, or
+   * webkitRelativePath) so the library can be browsed the way it is laid out on disk.
+   */
+  async addFiles(files: File[], opts: { folderOf?: (f: File) => string | undefined } = {}): Promise<TrackRef[]> {
     const audio = files.filter(isAudioFile);
     if (!audio.length) return [];
     const lib = useLibrary.getState();
+    const folderOf = opts.folderOf ?? ((f: File) => folderFromRelativePath((f as File & { webkitRelativePath?: string }).webkitRelativePath));
     const refs: TrackRef[] = audio.map((file) => {
       const g = metaFromFilename(file.name);
-      return { kind: 'local', file, meta: { id: trackKeyForFile(file), title: g.title, artist: g.artist, addedAt: Date.now() } };
+      return { kind: 'local', file, meta: { id: trackKeyForFile(file), title: g.title, artist: g.artist, folder: folderOf(file), addedAt: Date.now() } };
     });
     lib.addLocalTracks(refs);
     // metadata we already extracted in an earlier session — re-parsing every file on every
     // startup re-scan is slow and leaks one artwork object URL per track
     const storedById = new Map((await getStoredTracks()).map((r) => [r.id, r]));
     const known = refs.filter((r) => storedById.get(r.meta.id)?.meta.title);
-    for (const r of known) useLibrary.getState().updateLocalTrack(r.meta.id, { ...storedById.get(r.meta.id)!.meta, id: r.meta.id });
+    const refreshed: StoredTrack[] = [];
+    for (const r of known) {
+      const row = storedById.get(r.meta.id)!;
+      // ids are path-independent, so a file that moved (or a renamed folder) keeps its row —
+      // the folder we just walked is the truth, everything else comes from the stored tags
+      const folder = r.meta.folder ?? row.meta.folder;
+      useLibrary.getState().updateLocalTrack(r.meta.id, { ...row.meta, id: r.meta.id, folder });
+      if (folder !== row.meta.folder) refreshed.push({ ...row, meta: { ...row.meta, folder }, relativePath: folder });
+    }
+    if (refreshed.length) await putStoredTracks(refreshed);
     const todo = refs.filter((r) => !storedById.get(r.meta.id)?.meta.title);
     if (!todo.length) return refs;
     lib.setScanning({ active: true, done: 0, total: todo.length });
@@ -154,6 +176,7 @@ export const LocalLibrary = {
               fileName: r.file.name,
               size: r.file.size,
               lastModified: r.file.lastModified,
+              relativePath: r.meta.folder,
               addedAt: Date.now(),
             },
           ]);
@@ -167,7 +190,7 @@ export const LocalLibrary = {
   },
 
   /** Add Android SAF documents (content:// URIs with a persisted read grant). */
-  async addNativeFiles(files: NativeFile[], opts: { folderUri?: string; enrich?: boolean } = {}): Promise<TrackRef[]> {
+  async addNativeFiles(files: NativeFile[], opts: { folderUri?: string; folderName?: string; enrich?: boolean } = {}): Promise<TrackRef[]> {
     if (!files.length) return [];
     const lib = useLibrary.getState();
     const known = new Set(lib.localTracks.map((t) => t.meta.id));
@@ -179,7 +202,8 @@ export const LocalLibrary = {
       if (known.has(id)) continue;
       known.add(id);
       const g = metaFromFilename(f.name);
-      const meta: TrackMeta = { id, title: g.title, artist: g.artist, addedAt: Date.now() };
+      const folder = [opts.folderName, f.relativePath].filter(Boolean).join('/') || undefined;
+      const meta: TrackMeta = { id, title: g.title, artist: g.artist, folder, addedAt: Date.now() };
       const ref: TrackRef = { kind: 'native', uri: f.uri, meta };
       const row: StoredTrack = {
         id,
@@ -294,10 +318,17 @@ export const LocalLibrary = {
       // refresh URIs that changed (a moved file keeps its id) and forget vanished ones
       const moved: StoredTrack[] = [];
       const gone: string[] = [];
+      const folderName = res.name;
       for (const row of mine) {
         const f = seen.get(row.id);
-        if (!f) gone.push(row.id);
-        else if (f.uri !== row.uri) moved.push({ ...row, uri: f.uri, relativePath: f.relativePath });
+        if (!f) {
+          gone.push(row.id);
+          continue;
+        }
+        const folder = [folderName, f.relativePath].filter(Boolean).join('/') || undefined;
+        if (f.uri !== row.uri || row.relativePath !== f.relativePath || row.meta.folder !== folder) {
+          moved.push({ ...row, uri: f.uri, relativePath: f.relativePath, meta: { ...row.meta, folder } });
+        }
       }
       if (moved.length) await putStoredTracks(moved);
       if (gone.length) {
@@ -305,10 +336,12 @@ export const LocalLibrary = {
         for (const id of gone) useLibrary.getState().removeLocalTrack(id);
       }
       if (moved.length) {
-        const byId = new Map(moved.map((r) => [r.id, r.uri!]));
-        useLibrary.getState().replaceLocalTracks((t) => (t.kind === 'native' && byId.has(t.meta.id) ? { ...t, uri: byId.get(t.meta.id)! } : t));
+        const byId = new Map(moved.map((r) => [r.id, r]));
+        useLibrary
+          .getState()
+          .replaceLocalTracks((t) => (t.kind === 'native' && byId.has(t.meta.id) ? { ...t, uri: byId.get(t.meta.id)!.uri!, meta: { ...t.meta, folder: byId.get(t.meta.id)!.meta.folder } } : t));
       }
-      return await this.addNativeFiles(files, { folderUri: uri, enrich: opts.enrich });
+      return await this.addNativeFiles(files, { folderUri: uri, folderName: res.name, enrich: opts.enrich });
     } catch {
       return [];
     } finally {
@@ -318,17 +351,23 @@ export const LocalLibrary = {
 
   async scanDirectory(dir: FileSystemDirectoryHandle): Promise<TrackRef[]> {
     const files: File[] = [];
-    const walk = async (d: FileSystemDirectoryHandle, depth: number) => {
+    const folders = new Map<File, string>();
+    const walk = async (d: FileSystemDirectoryHandle, path: string, depth: number) => {
       if (depth > 6) return;
       for await (const [, h] of (d as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
         if (h.kind === 'file') {
           const f = await (h as FileSystemFileHandle).getFile();
-          if (isAudioFile(f)) files.push(f);
-        } else if (h.kind === 'directory') await walk(h as FileSystemDirectoryHandle, depth + 1);
+          if (!isAudioFile(f)) continue;
+          files.push(f);
+          folders.set(f, path);
+        } else if (h.kind === 'directory') {
+          const child = h as FileSystemDirectoryHandle;
+          await walk(child, `${path}/${child.name}`, depth + 1);
+        }
       }
     };
-    await walk(dir, 0);
-    return this.addFiles(files);
+    await walk(dir, dir.name, 0);
+    return this.addFiles(files, { folderOf: (f) => folders.get(f) });
   },
 
   /**
@@ -346,18 +385,22 @@ export const LocalLibrary = {
 
     if (hasNativeFiles()) {
       const native = rows.filter((r) => r.source === 'native' && r.uri);
-      let folders: string[] = [];
+      let folders: { uri: string; name: string }[] = [];
       try {
-        folders = (await NativeFiles.savedFolders()).folders.map((f) => f.uri);
+        folders = (await NativeFiles.savedFolders()).folders;
       } catch {
         folders = [];
       }
-      const covered = (uri: string) => folders.some((f) => uri === f || uri.startsWith(`${f}/document/`));
+      const rootOf = (uri: string) => folders.find((f) => uri === f.uri || uri.startsWith(`${f.uri}/document/`));
+      const covered = (uri: string) => !!rootOf(uri);
+      // rows written before folder browsing existed only have relativePath — rebuild the display path
+      const withFolder = (r: StoredTrack): TrackMeta =>
+        r.meta.folder ? r.meta : { ...r.meta, folder: [rootOf(r.uri!)?.name, r.relativePath].filter(Boolean).join('/') || undefined };
       const keep: TrackRef[] = [];
       const drop: string[] = [];
       const loose: StoredTrack[] = [];
       for (const r of native) {
-        if (covered(r.uri!)) keep.push({ kind: 'native', uri: r.uri!, meta: r.meta });
+        if (covered(r.uri!)) keep.push({ kind: 'native', uri: r.uri!, meta: withFolder(r) });
         else loose.push(r);
       }
       // individually picked files hold their own grant — check them all, in small parallel batches
@@ -371,7 +414,7 @@ export const LocalLibrary = {
           ),
         );
         chunk.forEach((r, j) => {
-          if (granted[j]) keep.push({ kind: 'native', uri: r.uri!, meta: r.meta });
+          if (granted[j]) keep.push({ kind: 'native', uri: r.uri!, meta: withFolder(r) });
           else drop.push(r.id);
         });
       }
@@ -385,7 +428,7 @@ export const LocalLibrary = {
       // pick up folder changes without blocking startup
       if (folders.length) {
         void (async () => {
-          for (const f of folders) await this.scanNativeFolder(f);
+          for (const f of folders) await this.scanNativeFolder(f.uri);
         })();
       }
     } else {

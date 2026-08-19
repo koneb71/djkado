@@ -3,6 +3,7 @@ import { trackKeyFor, trackKeyForFile } from '../tags';
 import { useCrates } from '@/store/crates';
 import { useDeckPrefs } from '@/store/deckPrefs';
 import type { TrackRef } from '@/services/tracks/TrackRef';
+import { buildFolderTree, folderCrumbs, folderExists, tracksInFolder, LOOSE_FILES } from '../folders';
 
 const nativeTrack = (id: string, artworkUrl?: string): TrackRef => ({
   kind: 'native',
@@ -67,5 +68,51 @@ describe('deck prefs', () => {
     useDeckPrefs.getState().set('B', { keylock: true });
     expect(useDeckPrefs.getState().decks.B.keylock).toBe(true);
     expect(useDeckPrefs.getState().decks.A.keylock).toBe(false);
+  });
+});
+
+describe('folder tree', () => {
+  const t = (id: string, folder?: string): TrackRef => ({ kind: 'demo', url: `/x/${id}`, meta: { id, title: id, artist: 'a', folder } });
+
+  it('nests folders and counts tracks per branch', () => {
+    const { roots, total } = buildFolderTree([
+      t('a', 'Crate/House/2024'),
+      t('b', 'Crate/House/2024'),
+      t('c', 'Crate/House/2023'),
+      t('d', 'Crate/Techno'),
+      t('e', 'Crate'),
+    ]);
+    expect(total).toBe(5);
+    expect(roots.map((r) => r.path)).toEqual(['Crate']);
+    expect(roots[0].total).toBe(5);
+    expect(roots[0].count).toBe(1); // only "e" sits directly in Crate
+    expect(roots[0].children.map((c) => `${c.name}:${c.total}`)).toEqual(['House:3', 'Techno:1']);
+    expect(roots[0].children[0].children.map((c) => `${c.name}:${c.total}`)).toEqual(['2023:1', '2024:2']);
+  });
+
+  it('groups tracks without a folder under Loose files, sorted last', () => {
+    const { roots } = buildFolderTree([t('a'), t('b', 'Zed'), t('c', 'Alpha')]);
+    expect(roots.map((r) => r.path)).toEqual(['Alpha', 'Zed', LOOSE_FILES]);
+  });
+
+  it('filters by prefix without matching sibling names that share it', () => {
+    const tracks = [t('a', 'Rock'), t('b', 'Rock/70s'), t('c', 'Rock Ballads')];
+    expect(tracksInFolder(tracks, 'Rock').map((x) => x.meta.id)).toEqual(['a', 'b']);
+    expect(tracksInFolder(tracks, null)).toHaveLength(3);
+  });
+
+  it('knows when a selected folder no longer exists', () => {
+    const { roots } = buildFolderTree([t('a', 'Crate/House')]);
+    expect(folderExists(roots, 'Crate/House')).toBe(true);
+    expect(folderExists(roots, 'Crate')).toBe(true);
+    expect(folderExists(roots, 'Crate/Techno')).toBe(false);
+  });
+
+  it('builds breadcrumbs for the drill-down bar', () => {
+    expect(folderCrumbs('Crate/House/2024')).toEqual([
+      { name: 'Crate', path: 'Crate' },
+      { name: 'House', path: 'Crate/House' },
+      { name: '2024', path: 'Crate/House/2024' },
+    ]);
   });
 });

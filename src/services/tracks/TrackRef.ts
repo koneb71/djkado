@@ -14,6 +14,8 @@ export interface TrackMeta {
   year?: number;
   addedAt?: number;
   playCount?: number;
+  /** display path of the folder this file lives in, e.g. "Music/House/2024" (local + native only) */
+  folder?: string;
 }
 
 export type TrackRef =

@@ -6,6 +6,8 @@ import { useCrates } from '@/store/crates';
 import { hasNativeFiles } from '@/mobile/nativeFiles';
 import { useAutomix } from '@/store/automix';
 import { CratesView } from './CratesView';
+import { FolderBar, FolderTree } from './FolderBrowser';
+import { tracksInFolder } from '@/services/localLibrary/folders';
 import { QueueView } from './QueueView';
 import { useLibrary, type SourceId } from '@/store/library';
 import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
@@ -17,6 +19,14 @@ import { ConnectCard } from './ConnectCard';
 import { Button } from '@/ui/Button';
 import { cn } from '@/ui/cn';
 import { useIsMobile } from '@/mobile/useIsMobile';
+
+/** Pick a folder and jump straight to it in the browser. */
+async function addFolderAndSelect() {
+  const added = await LocalLibrary.pickFolder();
+  const folder = added.find((t) => t.meta.folder)?.meta.folder;
+  if (!folder) return;
+  useLibrary.getState().setFolderPath(folder.split('/')[0]);
+}
 
 const TABS: { id: SourceId; label: string; icon: React.ReactNode }[] = [
   { id: 'local', label: 'Local', icon: <HardDrive size={12} /> },
@@ -86,7 +96,7 @@ export function LibraryBrowser() {
             <Button size="xs" onClick={() => void LocalLibrary.pickFiles()}>
               <FilePlus2 size={12} /> Add files
             </Button>
-            <Button size="xs" onClick={() => void LocalLibrary.pickFolder()}>
+            <Button size="xs" onClick={() => void addFolderAndSelect()}>
               <FolderOpen size={12} /> Add folder
             </Button>
           </>
@@ -107,7 +117,7 @@ function AddMusicRow() {
   const scanning = useLibrary((s) => s.scanning);
   return (
     <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 py-1.5">
-      <Button size="sm" className="flex-1" onClick={() => void LocalLibrary.pickFolder()}>
+      <Button size="sm" className="flex-1" onClick={() => void addFolderAndSelect()}>
         <FolderOpen size={14} /> Add folder
       </Button>
       <Button size="sm" className="flex-1" onClick={() => void LocalLibrary.pickFiles()}>
@@ -127,6 +137,11 @@ const foldersPersist = () => hasNativeFiles() || (typeof window !== 'undefined' 
 
 function LocalView() {
   const tracks = useLibrary((s) => s.localTracks);
+  const folderPath = useLibrary((s) => s.folderPath);
+  const mobile = useIsMobile();
+  const search = useLibrary((s) => s.search.trim());
+  const shown = useMemo(() => tracksInFolder(tracks, folderPath), [tracks, folderPath]);
+  const emptyHint = search ? `No tracks match “${search}”${folderPath ? ' in this folder' : ''}.` : 'This folder is empty.';
   if (!tracks.length) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -138,7 +153,7 @@ function LocalView() {
             : 'Drop audio files or folders anywhere. This browser can’t re-open them next visit — Chrome, Edge, the desktop app or the Android app can.'}
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={() => void LocalLibrary.pickFolder()}>
+          <Button size="sm" onClick={() => void addFolderAndSelect()}>
             <FolderOpen size={14} /> Add folder
           </Button>
           <Button size="sm" variant="ghost" onClick={() => void LocalLibrary.pickFiles()}>
@@ -148,7 +163,20 @@ function LocalView() {
       </div>
     );
   }
-  return <TrackTable tracks={tracks} emptyHint="No tracks match your filter." />;
+  if (mobile) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <FolderBar tracks={tracks} />
+        <TrackTable tracks={shown} emptyHint={emptyHint} />
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-h-0 flex-1">
+      <FolderTree tracks={tracks} />
+      <TrackTable tracks={shown} emptyHint={emptyHint} />
+    </div>
+  );
 }
 
 function HistoryView() {

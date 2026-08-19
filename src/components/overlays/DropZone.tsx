@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, type DragEvent, type ReactNode } from 'r
 import { AnimatePresence, motion } from 'motion/react';
 import { FolderDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
+import { LocalLibrary, folderFromRelativePath } from '@/services/localLibrary/LocalLibrary';
 import { useLibrary } from '@/store/library';
 
 /** Whole-window drop target for audio files/folders. Deck-specific drops are handled by the decks. */
@@ -32,9 +32,18 @@ export function DropZone({ children }: { children: ReactNode }) {
     e.preventDefault();
     const items = Array.from(e.dataTransfer.items ?? []);
     const files: File[] = [];
+    const folders = new Map<File, string>();
     const walkEntry = async (entry: any): Promise<void> => {
       if (entry.isFile) {
-        await new Promise<void>((res) => entry.file((f: File) => { files.push(f); res(); }, () => res()));
+        await new Promise<void>((res) =>
+          entry.file((f: File) => {
+            files.push(f);
+            // fullPath is "/Crate/Deep Cut.wav" → remember "Crate" so the library can group by folder
+            const folder = folderFromRelativePath(entry.fullPath);
+            if (folder) folders.set(f, folder);
+            res();
+          }, () => res()),
+        );
       } else if (entry.isDirectory) {
         const reader = entry.createReader();
         const readAll = async (): Promise<any[]> => {
@@ -52,7 +61,7 @@ export function DropZone({ children }: { children: ReactNode }) {
     const entries = items.map((i) => (i as any).webkitGetAsEntry?.()).filter(Boolean);
     if (entries.length) for (const en of entries) await walkEntry(en);
     else files.push(...Array.from(e.dataTransfer.files));
-    const added = await LocalLibrary.addFiles(files);
+    const added = await LocalLibrary.addFiles(files, { folderOf: (f) => folders.get(f) });
     useLibrary.getState().setSource('local');
     if (added.length) toast.success(`Added ${added.length} track${added.length === 1 ? '' : 's'} to your library`);
     else toast.error('No audio files found in the drop');

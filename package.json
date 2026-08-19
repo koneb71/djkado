@@ -1,7 +1,7 @@
 {
   "name": "djkado",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "description": "DJKado — a VirtualDJ-style browser DJ app with a hybrid local/streaming engine",
   "scripts": {
