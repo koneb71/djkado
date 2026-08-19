@@ -50,6 +50,7 @@ export const DEFAULT_KEYMAP: KeyBinding[] = [
   { key: 'KeyL', action: 'ui.library', label: 'Toggle library' },
   { key: 'KeyN', action: 'ui.layout', label: 'Toggle 2/4 decks' },
   { key: 'KeyM', action: 'ui.sampler', label: 'Toggle sampler' },
+  { key: 'KeyM', action: 'sampler.bank.next', label: 'Next sampler bank', shift: true },
   { key: 'F1', action: 'sampler.1', label: 'Sampler pad 1' },
   { key: 'F2', action: 'sampler.2', label: 'Sampler pad 2' },
   { key: 'F3', action: 'sampler.3', label: 'Sampler pad 3' },

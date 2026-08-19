@@ -25,6 +25,7 @@ export type ActionId =
   | 'mixer.fader' | 'mixer.gain' | 'mixer.high' | 'mixer.mid' | 'mixer.low' | 'mixer.filter' | 'mixer.cue' | 'mixer.crossfader' | 'mixer.master'
   | 'browser.up' | 'browser.down' | 'browser.loadFocused'
   | 'sampler.1' | 'sampler.2' | 'sampler.3' | 'sampler.4' | 'sampler.5' | 'sampler.6' | 'sampler.7' | 'sampler.8'
+  | 'sampler.bank.next' | 'sampler.bank.prev'
   | 'ui.layout' | 'ui.sampler' | 'ui.library' | 'record.toggle'
   | 'browser.queue' | 'browser.queueNext' | 'automix.toggle' | 'automix.skip'
   | 'deck.stems.toggle' | 'deck.stems.prepare' | 'deck.stems.panel'
@@ -46,6 +47,7 @@ export const ACTION_LABELS: Partial<Record<ActionId, string>> = {
   'deck.stems.vocals.level': 'Vocals level', 'deck.stems.drums.level': 'Drums level', 'deck.stems.bass.level': 'Bass level', 'deck.stems.other.level': 'Other level',
   'deck.padMode.hotcue': 'Pads: hot cue', 'deck.padMode.roll': 'Pads: roll', 'deck.padMode.slicer': 'Pads: slicer', 'deck.padMode.beatjump': 'Pads: beat jump', 'deck.padMode.next': 'Pads: next mode',
   'browser.up': 'Browse up', 'browser.down': 'Browse down', 'browser.loadFocused': 'Load to focused deck', 'ui.layout': 'Toggle 2/4 decks', 'ui.sampler': 'Toggle sampler', 'ui.library': 'Toggle library', 'record.toggle': 'Record',
+  'sampler.bank.next': 'Sampler bank +', 'sampler.bank.prev': 'Sampler bank −',
   'browser.queue': 'Add selected to queue', 'browser.queueNext': 'Play selected next', 'automix.toggle': 'Auto DJ on/off', 'automix.skip': 'Auto DJ: skip / mix now',
 };
 
@@ -102,6 +104,15 @@ export function performAction(action: ActionId, value: number, ctx: ActionContex
     else if (pressed) {
       if (sm[2] === 'mute') dk.toggleStemMute(name);
       else dk.toggleStemSolo(name);
+    }
+    return;
+  }
+  if (action === 'sampler.bank.next' || action === 'sampler.bank.prev') {
+    if (pressed) {
+      const { banks, bank, setBank } = useSampler.getState();
+      const i = Math.max(0, banks.findIndex((b) => b.id === bank));
+      const next = banks[(i + (action === 'sampler.bank.next' ? 1 : banks.length - 1)) % banks.length];
+      if (next) setBank(next.id);
     }
     return;
   }

@@ -26,7 +26,7 @@ Open **http://127.0.0.1:5173**, click once to power on the audio engine, then dr
 | **Mixer** | Gain, 3-band EQ with full kill, dual LP/HP filter, faders with VU meters, crossfader (linear / power / cut) with A/B/thru assignment, master limiter + meters |
 | **Headphone cue** | Real PFL on a **second audio output** (`AudioContext.setSinkId` — USB card / Bluetooth headphones), cue-mix + phones volume, split cue (L = cue, R = master), library **pre-listen** button per track; falls back to blending the cue into the master when no headphone output is set |
 | **FX** | 3 insert slots per deck: Echo, Reverb, Flanger, Phaser, Bitcrusher (AudioWorklet), Filter LFO, Gate — beat-synced to the deck's tempo |
-| **Sampler** | 2 banks × 8 pads (one-shot / hold / loop), synthesized starter kit, load your own samples by click or drop |
+| **Sampler** | As many banks as you need (add / rename / delete, up to 12) × 8 pads (one-shot / hold / loop), synthesized starter kit, load your own samples by click or drop — banks *and* the samples in them are remembered between sessions |
 | **Stems** | On-device 4-stem separation (vocals / drums / bass / other) with HTDemucs on WebGPU — per-deck stem faders, mute/solo, Acapella / Instrumental / Drumless presets, sample-accurate mixing in the deck worklet, cached in IndexedDB |
 | **Recording** | Master mix to WebM/Opus (or WAV) with one click |
 | **Control** | VirtualDJ-like keyboard map (press `?`), Web MIDI with learn mode, LED feedback hooks |
@@ -157,7 +157,7 @@ Memory: the container is idle-cheap; heavy work (analysis, stem separation) happ
 
 ## Keyboard (press `?` in the app)
 
-`Q/W` play A/B · `A/S` cue · `Z/X` sync · `1-4` / `7-0` hot cues · `E/O` loop · `R/T` `U/I` loop ½/×2 · `D/F` `J/K` bend · `C/V` censor · `G/H` slip · `↑/↓` browse · `Shift+←/→` load to A/B · `Enter` load to focused deck · `Space` play focused · `L` library · `N` 2/4 decks · `M` sampler · `F1–F8` sampler pads · `Shift+B` record · `Tab` cycle pad mode · `Shift+Q` add selected to queue · `Shift+A` Auto DJ on/off · `Shift+S` Auto DJ skip. Shift-drag knobs for fine control, double-click to reset, scroll the waveform to zoom.
+`Q/W` play A/B · `A/S` cue · `Z/X` sync · `1-4` / `7-0` hot cues · `E/O` loop · `R/T` `U/I` loop ½/×2 · `D/F` `J/K` bend · `C/V` censor · `G/H` slip · `↑/↓` browse · `Shift+←/→` load to A/B · `Enter` load to focused deck · `Space` play focused · `L` library · `N` 2/4 decks · `M` sampler · `F1–F8` sampler pads · `Shift+B` record · `Shift+M` next sampler bank · `Tab` cycle pad mode · `Shift+Q` add selected to queue · `Shift+A` Auto DJ on/off · `Shift+S` Auto DJ skip. Shift-drag knobs for fine control, double-click to reset, scroll the waveform to zoom.
 
 ---
 

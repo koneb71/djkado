@@ -70,7 +70,9 @@ export function Mixer() {
   const short = useShortViewport();
   const decks: DeckId[] = compact ? ['C', 'A', 'B', 'D'] : ['A', 'B'];
   return (
-    <div className={cn('panel noise flex h-full flex-col items-center overflow-hidden px-2', short ? 'gap-1 py-1.5' : 'gap-2 py-2.5')}>
+    // on a short window (sampler open, small laptop) the strip can be taller than its box —
+    // scroll it instead of clipping the crossfader out of reach
+    <div className={cn('panel noise flex h-full flex-col items-center overflow-y-auto overflow-x-hidden px-2', short ? 'gap-1 py-1.5' : 'gap-2 py-2.5')}>
       {!short && <SectionLabel>Mixer</SectionLabel>}
       <div className={cn('flex flex-1 items-start', compact ? 'gap-2' : 'gap-4')}>
         {decks.map((id) => (
