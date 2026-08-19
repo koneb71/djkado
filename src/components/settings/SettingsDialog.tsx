@@ -11,6 +11,8 @@ import { useRecorder } from '@/audio/engine/Recorder';
 import { useMidiStore, ACTION_LABELS_LIST } from './midiHelpers';
 import { AudioEngine } from '@/audio/engine/AudioEngine';
 import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
+import { hasNativeFiles } from '@/mobile/nativeFiles';
+import { useLibrary } from '@/store/library';
 import { cn } from '@/ui/cn';
 import type { DeckId } from '@/audio/engine/types';
 import { DesktopSettings } from './DesktopSettings';
@@ -49,6 +51,7 @@ export function SettingsDialog() {
   const [outputId, setOutputId] = useState('default');
   const [learnDeck, setLearnDeck] = useState<DeckId>('A');
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
+  const unavailableTracks = useLibrary((s) => s.unavailableTracks);
   const canSink = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
   const cueDeviceId = useMixer((s) => s.cueDeviceId);
   const setCueDeviceId = useMixer((s) => s.setCueDeviceId);
@@ -173,17 +176,22 @@ export function SettingsDialog() {
 
         <section>
           <SectionLabel className="mb-1">Library</SectionLabel>
-          <Row label="Saved folders" hint="Re-scan folders you granted access to (Chrome/Edge)">
-            <Button size="xs" onClick={() => LocalLibrary.restoreFolders().then((n) => toast.success(`Re-scanned ${n} folder${n === 1 ? '' : 's'}`))}>
+          <Row label="Saved folders" hint={hasNativeFiles() ? 'Folders you granted access to — restored automatically on every launch' : 'Re-scan folders you granted access to (Chrome/Edge)'}>
+            <Button size="xs" onClick={() => void LocalLibrary.restoreFolders().then((n) => toast.success(`Re-scanned ${n} folder${n === 1 ? '' : 's'}`))}>
               <FolderSync size={12} /> Re-scan
             </Button>
           </Row>
           <div className="flex flex-col gap-1">
+            {unavailableTracks > 0 && (
+              <div className="rounded bg-warn/10 px-2 py-1 text-[11px] text-warn">
+                {unavailableTracks} track{unavailableTracks === 1 ? '' : 's'} added as individual files in an earlier session can’t be re-opened by the browser. Add the folder they live in and they come back on every launch.
+              </div>
+            )}
             {folders.length === 0 && <div className="text-[11px] text-text-faint">No saved folders yet — use “Add folder” in the library.</div>}
             {folders.map((f) => (
               <div key={f.id} className="flex items-center justify-between rounded bg-bg-elev px-2 py-1 text-xs">
                 <span className="truncate">{f.name}</span>
-                <button type="button" className="text-text-faint hover:text-danger" onClick={() => LocalLibrary.forgetFolder(f.id).then(() => setFolders((x) => x.filter((y) => y.id !== f.id)))} aria-label="Forget folder">
+                <button type="button" className="text-text-faint hover:text-danger" onClick={() => void LocalLibrary.forgetFolder(f.id).then(() => setFolders((x) => x.filter((y) => y.id !== f.id)))} aria-label="Forget folder">
                   <Trash2 size={12} />
                 </button>
               </div>

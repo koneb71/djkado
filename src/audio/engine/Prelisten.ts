@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { AudioEngine } from './AudioEngine';
 import type { TrackRef } from '@/services/tracks/TrackRef';
 import { isStreamTrack } from '@/services/tracks/TrackRef';
+import { arrayBufferOf } from '@/services/tracks/bytes';
 
 interface PrelistenState {
   trackId: string | null;
@@ -50,7 +51,7 @@ class PrelistenImpl {
     this.pushCue();
     try {
       if (this.bufferId !== track.meta.id || !this.buffer) {
-        const data = await this.arrayBufferOf(track);
+        const data = await arrayBufferOf(track);
         if (seq !== this.loadSeq) return;
         this.buffer = await AudioEngine.ctx.decodeAudioData(data);
         this.bufferId = track.meta.id;
@@ -125,18 +126,6 @@ class PrelistenImpl {
     this.gain = null;
   }
 
-  private async arrayBufferOf(track: TrackRef): Promise<ArrayBuffer> {
-    switch (track.kind) {
-      case 'local':
-        return track.file.arrayBuffer();
-      case 'demo':
-        return (await fetch(track.url)).arrayBuffer();
-      case 'apple-preview':
-        return (await fetch(track.previewUrl)).arrayBuffer();
-      default:
-        throw new Error('not decodable');
-    }
-  }
 }
 
 export const Prelisten = new PrelistenImpl();

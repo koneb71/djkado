@@ -4,6 +4,7 @@ import { DEFAULT_STEM_MODEL, STEM_ORDER } from './models';
 import { useStems, type StemJob } from '@/store/stems';
 import { getStoredStems, hasStoredStems, putStoredStems, type StoredStems } from '@/services/localLibrary/db';
 import type { TrackRef } from '@/services/tracks/TrackRef';
+import { arrayBufferOf } from '@/services/tracks/bytes';
 
 export interface StemsData {
   sampleRate: number;
@@ -42,13 +43,7 @@ async function fromBlobs(parts: Blob[]): Promise<Int16Array> {
 
 /** Decode a track's source at 44.1 kHz stereo (OfflineAudioContext resamples for us). */
 async function decodeAt44k(track: TrackRef, signal?: AbortSignal): Promise<{ left: Float32Array; right: Float32Array }> {
-  let ab: ArrayBuffer;
-  if (track.kind === 'local') ab = await track.file.arrayBuffer();
-  else if (track.kind === 'demo' || track.kind === 'apple-preview') {
-    const res = await fetch(track.kind === 'demo' ? track.url : track.previewUrl, { signal });
-    if (!res.ok) throw new Error(`fetch failed (${res.status})`);
-    ab = await res.arrayBuffer();
-  } else throw new Error('Stems are only available for local files and previews');
+  const ab = await arrayBufferOf(track, signal);
   const octx = new OfflineAudioContext(2, 1, DEFAULT_STEM_MODEL.sampleRate);
   const audio = await octx.decodeAudioData(ab);
   const left = new Float32Array(audio.length);

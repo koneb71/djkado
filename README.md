@@ -30,7 +30,7 @@ Open **http://127.0.0.1:5173**, click once to power on the audio engine, then dr
 | **Stems** | On-device 4-stem separation (vocals / drums / bass / other) with HTDemucs on WebGPU — per-deck stem faders, mute/solo, Acapella / Instrumental / Drumless presets, sample-accurate mixing in the deck worklet, cached in IndexedDB |
 | **Recording** | Master mix to WebM/Opus (or WAV) with one click |
 | **Control** | VirtualDJ-like keyboard map (press `?`), Web MIDI with learn mode, LED feedback hooks |
-| **Library** | Local files & folders (File System Access API, tags + artwork via music-metadata), History, **crates** (playlists, drag-to-crate, rename/delete), **play queue** (reorder, play-next, shuffle), row context menu, key-compatible track highlighting, virtualized table, drag-to-deck |
+| **Library** | Local files & folders (File System Access API on desktop, Android Storage Access Framework on the phone — both remembered between launches; tags + artwork via music-metadata / MediaMetadataRetriever), History, **crates** (playlists, drag-to-crate, rename/delete), **play queue** (reorder, play-next, shuffle), row context menu, key-compatible track highlighting, virtualized table, drag-to-deck |
 | **Auto DJ** | Plays the queue on decks A/B: preloads the next track, tempo-matches + phase-aligns via the sync engine, crossfades over 4/8/16/32 bars with optional bass swap, glides back to the track's own tempo, skips missing files, *Skip* to mix now — works on desktop and phone |
 | **Streaming** | Spotify & Apple Music sources with the same browse → load workflow. Ships in **mock mode** (demo catalog) until you add credentials — see below |
 
@@ -118,7 +118,17 @@ pnpm android:open      # open the project in Android Studio
 ```
 Requirements: Android Studio (SDK 35+, JDK 21 — set `JAVA_HOME` to Android Studio's JBR if needed). The Release workflow also builds an APK for every `v*` tag (signed when `ANDROID_KEYSTORE_BASE64` / `_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` secrets are set, debug-signed otherwise) and attaches it to the GitHub release; sideload it with "Install unknown apps" enabled.
 
-Notes: local files come in through the system picker (Add files → Android document picker); Stems run on the CPU (WebView has no WebGPU) — expect several minutes per track on a phone; Spotify/Apple Music DRM streams are not available in the WebView.
+Notes: Stems run on the CPU (the WebView has no WebGPU) — expect several minutes per track on a phone; Spotify/Apple Music DRM streams are not available in the WebView.
+
+### Your music, and what the app remembers
+
+Android's WebView has no File System Access API (and no `<input webkitdirectory>`), so **Add folder** goes through a small native plugin (`android/app/src/main/java/com/djkado/app/FilesPlugin.java`) that uses the **Storage Access Framework**: you grant one folder, Android *persists* that grant, and DJKado re-opens the folder on every launch and picks up files you added since. Tags come from `MediaMetadataRetriever` (no file is copied into the WebView), and audio is read as `content://` → `Capacitor.convertFileSrc()` → `https://localhost/_capacitor_content_/…`, same origin as the app. No storage permission is requested — SAF needs none.
+
+Note for contributors: always read those URLs **whole** (`fetch(url).arrayBuffer()`, via `src/services/tracks/bytes.ts`). Capacitor's local server answers a `Range` request with `206` but streams from byte 0, so a ranged read silently returns the wrong audio — never point an `<audio>`/MediaSource at a native track.
+
+Persisted across restarts (all platforms): the library, crates + queue, hot cues / beat-grid edits / analysis cache (keyed by `name|size|mtime`, so the same file keeps its data whichever way it was added), the FX rack per deck, sampler pads *and* the samples you loaded, per-deck switches (key lock, quantize, slip, auto-loop size, pitch range), MIDI mappings, master/trim/curve and headphone settings. Deliberately **not** restored: loaded tracks and play state, sync/master, channel faders, EQ, filter and the crossfader — a fader restored at 0 is indistinguishable from a broken app.
+
+In a plain browser, files added with drag & drop or **Add files** cannot be re-opened on the next visit (the File System Access API only persists *folder* handles) — those show up as "needs re-adding" in Settings ▸ Library. Add a folder instead and it comes back by itself.
 
 ---
 

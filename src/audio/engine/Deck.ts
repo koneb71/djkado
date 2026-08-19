@@ -10,6 +10,7 @@ import { beatLength, nearestBeat, quantize, type BeatGrid, nudgeGridTo, beatInde
 import { getCues, putCues, addHistory } from '@/services/localLibrary/db';
 import { clamp } from '../dsp/math';
 import { useLibrary } from '@/store/library';
+import { LocalLibrary } from '@/services/localLibrary/LocalLibrary';
 import { StemsQueue, type StemsData } from '../stems/StemsQueue';
 import { STEM_ORDER, type StemName } from '../stems/models';
 import { effectiveStemGains, useStems } from '@/store/stems';
@@ -207,7 +208,14 @@ export class Deck {
         cuePoint: this.cuePoint,
       });
       addHistory({ trackId: track.meta.id, meta: track.meta, deck: this.id });
-      if (a && track.kind === 'local') useLibrary.getState().updateLocalTrack(track.meta.id, { bpm: a.bpm || track.meta.bpm, key: a.key.camelot || track.meta.key, durationSec: info.duration });
+      // cover art is fetched lazily — only for tracks that actually reach a deck
+      if (!track.meta.artworkUrl && (track.kind === 'native' || track.kind === 'local')) {
+        void LocalLibrary.loadArtwork(track).then((artworkUrl) => {
+          if (!artworkUrl || this.trackId !== track.meta.id) return;
+          this.patch((d) => (d.track ? { track: { ...d.track, meta: { ...d.track.meta, artworkUrl } } as TrackRef } : {}));
+        });
+      }
+      if (a && (track.kind === 'local' || track.kind === 'native')) useLibrary.getState().updateLocalTrack(track.meta.id, { bpm: a.bpm || track.meta.bpm, key: a.key.camelot || track.meta.key, durationSec: info.duration });
       this.emit({ type: 'loaded' });
       // stems: attach cached ones (or auto-prepare when enabled), without blocking the load
       this.resetStemsState();

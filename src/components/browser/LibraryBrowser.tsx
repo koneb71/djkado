@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { FolderOpen, FilePlus2, HardDrive, History, ListMusic, Search, X, Loader2, Box, ListOrdered } from 'lucide-react';
+import { FolderOpen, FilePlus2, HardDrive, History, ListMusic, Search, X, Loader2, Box, ListOrdered, Music4 } from 'lucide-react';
 import { useCrates } from '@/store/crates';
+import { hasNativeFiles } from '@/mobile/nativeFiles';
 import { useAutomix } from '@/store/automix';
 import { CratesView } from './CratesView';
 import { QueueView } from './QueueView';
@@ -33,6 +34,7 @@ export function LibraryBrowser() {
   const setSearch = useLibrary((s) => s.setSearch);
   const scanning = useLibrary((s) => s.scanning);
   const queueLen = useCrates((s) => s.queue.length);
+  const localCount = useLibrary((s) => s.localTracks.length);
   const automixOn = useAutomix((s) => s.enabled);
   const mobile = useIsMobile();
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -79,17 +81,18 @@ export function LibraryBrowser() {
             <Loader2 size={11} className="animate-spin" /> Reading tags {scanning.done}/{scanning.total}
           </span>
         )}
-        {source === 'local' && (
+        {source === 'local' && !mobile && (
           <>
-            <Button size="xs" onClick={() => LocalLibrary.pickFiles()}>
+            <Button size="xs" onClick={() => void LocalLibrary.pickFiles()}>
               <FilePlus2 size={12} /> Add files
             </Button>
-            <Button size="xs" onClick={() => LocalLibrary.pickFolder()}>
+            <Button size="xs" onClick={() => void LocalLibrary.pickFolder()}>
               <FolderOpen size={12} /> Add folder
             </Button>
           </>
         )}
       </div>
+      {source === 'local' && mobile && localCount > 0 && <AddMusicRow />}
       {source === 'local' && <LocalView />}
       {source === 'history' && <HistoryView />}
       {source === 'crates' && <CratesView />}
@@ -99,9 +102,53 @@ export function LibraryBrowser() {
   );
 }
 
+/** Phones: always-visible, thumb-sized library actions (the header strip scrolls horizontally). */
+function AddMusicRow() {
+  const scanning = useLibrary((s) => s.scanning);
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 py-1.5">
+      <Button size="sm" className="flex-1" onClick={() => void LocalLibrary.pickFolder()}>
+        <FolderOpen size={14} /> Add folder
+      </Button>
+      <Button size="sm" className="flex-1" onClick={() => void LocalLibrary.pickFiles()}>
+        <FilePlus2 size={14} /> Add files
+      </Button>
+      {scanning.active && (
+        <span className="flex items-center gap-1 whitespace-nowrap text-[10px] text-text-dim">
+          <Loader2 size={11} className="animate-spin" /> {scanning.done}/{scanning.total}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Can this platform re-open a folder on the next launch? (SAF on Android, FS Access elsewhere) */
+const foldersPersist = () => hasNativeFiles() || (typeof window !== 'undefined' && 'showDirectoryPicker' in window);
+
 function LocalView() {
   const tracks = useLibrary((s) => s.localTracks);
-  return <TrackTable tracks={tracks} emptyHint="Your library is empty — drop audio files or folders anywhere, or use “Add files”." />;
+  if (!tracks.length) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+        <Music4 size={28} className="text-text-faint" />
+        <div className="text-xs text-text-dim">Your library is empty</div>
+        <div className="max-w-[280px] text-[11px] text-text-faint">
+          {foldersPersist()
+            ? 'Add a folder of music — DJKado keeps access to it, so your library is still here next time you open the app.'
+            : 'Drop audio files or folders anywhere. This browser can’t re-open them next visit — Chrome, Edge, the desktop app or the Android app can.'}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => void LocalLibrary.pickFolder()}>
+            <FolderOpen size={14} /> Add folder
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void LocalLibrary.pickFiles()}>
+            <FilePlus2 size={14} /> Add files
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return <TrackTable tracks={tracks} emptyHint="No tracks match your filter." />;
 }
 
 function HistoryView() {

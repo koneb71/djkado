@@ -1,5 +1,6 @@
 import type { DeckBackend, BackendEvent } from './DeckBackend';
 import { FULL_CAPS, type LoadedTrackInfo } from '../engine/types';
+import { arrayBufferOf } from '@/services/tracks/bytes';
 import type { TrackRef } from '@/services/tracks/TrackRef';
 import { AnalysisQueue } from '../workers/AnalysisQueue';
 import deckPlayerUrl from '../worklets/deck-player.worklet.ts?worker&url';
@@ -151,14 +152,7 @@ export class WebAudioBackend implements DeckBackend {
     await this.ready;
     const onProgress = opts?.onProgress;
     onProgress?.(0.02, 'reading');
-    let arrayBuffer: ArrayBuffer;
-    if (track.kind === 'local') arrayBuffer = await track.file.arrayBuffer();
-    else if (track.kind === 'demo' || track.kind === 'apple-preview') {
-      const url = track.kind === 'demo' ? track.url : track.previewUrl;
-      const res = await fetch(url, { signal: opts?.signal });
-      if (!res.ok) throw new Error(`Failed to fetch audio (${res.status})`);
-      arrayBuffer = await res.arrayBuffer();
-    } else throw new Error(`WebAudioBackend cannot play ${track.kind}`);
+    const arrayBuffer = await arrayBufferOf(track, opts?.signal);
     if (opts?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
     onProgress?.(0.1, 'decoding');

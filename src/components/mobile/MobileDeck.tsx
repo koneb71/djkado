@@ -12,6 +12,7 @@ import { PadGrid } from '../deck/PadGrid';
 import { WaveformOverview } from '../waveform/WaveformOverview';
 import { deckColor } from '../deck/deckTheme';
 import { useStems } from '@/store/stems';
+import { useFx } from '@/store/fx';
 import { useMobileUi } from '@/mobile/store';
 import { tap } from '@/mobile/native';
 import { cn } from '@/ui/cn';
@@ -25,6 +26,7 @@ export function MobileDeck({ id, landscape }: { id: DeckId; landscape?: boolean 
   const color = deckColor(id);
   const timeRef = useRef<HTMLSpanElement>(null);
   const stems = useStems((s) => s.decks[id]);
+  const fxOn = useFx((s) => s.decks[id].some((slot) => slot.kind && slot.enabled));
   const setTab = useMobileUi((s) => s.setTab);
   const setMixDeck = useMobileUi((s) => s.setMixDeck);
   const setMixSection = useMobileUi((s) => s.setMixSection);
@@ -76,6 +78,19 @@ export function MobileDeck({ id, landscape }: { id: DeckId; landscape?: boolean 
           <span className="pointer-events-none absolute right-1 top-1 rounded-sm bg-[#f472b6]/80 px-1 text-[8px] font-black uppercase text-bg">
             Stems
           </span>
+        )}
+        {fxOn && (
+          <button
+            type="button"
+            onClick={() => {
+              setMixDeck(id);
+              setMixSection('fx');
+              setTab('mix');
+            }}
+            className="absolute left-1 top-1 rounded-sm bg-accent/80 px-1 text-[8px] font-black uppercase text-bg"
+          >
+            FX on
+          </button>
         )}
       </div>
 

@@ -21,6 +21,8 @@ interface LibraryState {
   loading: boolean;
   scanning: { active: boolean; done: number; total: number };
   selectedTrackId: string | null;
+  /** tracks stored from an earlier session whose files can no longer be opened (web only) */
+  unavailableTracks: number;
   sortKey: 'title' | 'artist' | 'bpm' | 'key' | 'duration' | 'added';
   sortDir: 'asc' | 'desc';
   setSource: (s: SourceId) => void;
@@ -28,6 +30,8 @@ interface LibraryState {
   addLocalTracks: (t: TrackRef[]) => void;
   updateLocalTrack: (id: string, patch: Partial<TrackRef['meta']>) => void;
   removeLocalTrack: (id: string) => void;
+  /** map over the local tracks in place (used when a file moves and its URI changes) */
+  replaceLocalTracks: (fn: (t: TrackRef) => TrackRef) => void;
   clearLocal: () => void;
   setPlaylists: (s: SourceId, p: Playlist[]) => void;
   selectPlaylist: (s: SourceId, id: string | null) => void;
@@ -36,6 +40,7 @@ interface LibraryState {
   setScanning: (p: Partial<LibraryState['scanning']>) => void;
   select: (id: string | null) => void;
   setSort: (k: LibraryState['sortKey']) => void;
+  setUnavailable: (n: number) => void;
 }
 
 export const useLibrary = create<LibraryState>((set) => ({
@@ -48,6 +53,7 @@ export const useLibrary = create<LibraryState>((set) => ({
   loading: false,
   scanning: { active: false, done: 0, total: 0 },
   selectedTrackId: null,
+  unavailableTracks: 0,
   sortKey: 'added',
   sortDir: 'desc',
   setSource: (source) => set({ source }),
@@ -61,6 +67,7 @@ export const useLibrary = create<LibraryState>((set) => ({
   updateLocalTrack: (id, patch) =>
     set((s) => ({ localTracks: s.localTracks.map((t) => (t.meta.id === id ? ({ ...t, meta: { ...t.meta, ...patch } } as TrackRef) : t)) })),
   removeLocalTrack: (id) => set((s) => ({ localTracks: s.localTracks.filter((t) => t.meta.id !== id) })),
+  replaceLocalTracks: (fn) => set((s) => ({ localTracks: s.localTracks.map(fn) })),
   clearLocal: () => set({ localTracks: [] }),
   setPlaylists: (src, p) => set((s) => ({ playlists: { ...s.playlists, [src]: p } })),
   selectPlaylist: (src, id) => set((s) => ({ selectedPlaylist: { ...s.selectedPlaylist, [src]: id } })),
@@ -68,5 +75,6 @@ export const useLibrary = create<LibraryState>((set) => ({
   setLoading: (loading) => set({ loading }),
   setScanning: (p) => set((s) => ({ scanning: { ...s.scanning, ...p } })),
   select: (selectedTrackId) => set({ selectedTrackId }),
+  setUnavailable: (unavailableTracks) => set({ unavailableTracks }),
   setSort: (k) => set((s) => ({ sortKey: k, sortDir: s.sortKey === k ? (s.sortDir === 'asc' ? 'desc' : 'asc') : 'asc' })),
 }));

@@ -4,8 +4,20 @@ const AUDIO_EXT = /\.(mp3|m4a|aac|wav|flac|ogg|oga|opus|aif|aiff|webm|mp4)$/i;
 
 export const isAudioFile = (f: File) => AUDIO_EXT.test(f.name) || f.type.startsWith('audio/');
 
+/**
+ * Stable library key. Derived from name|size|mtime (not the file handle or URI) so the same
+ * physical file gets the same id whether it arrived by drag & drop, the file picker or Android's
+ * Storage Access Framework — which keeps the analysis / cues / stems caches warm across restarts.
+ */
+export function trackKeyFor(name: string, size: number, lastModified: number, fallback?: string): string {
+  // a provider that reports neither size nor mtime would give two different files the same key,
+  // which would cross-wire their hot cues and analysis — fall back to something unique per file
+  if (!size && !lastModified && fallback) return `local:${name}|${fallback}`;
+  return `local:${name}|${size}|${lastModified}`;
+}
+
 export function trackKeyForFile(f: File): string {
-  return `local:${f.name}|${f.size}|${f.lastModified}`;
+  return trackKeyFor(f.name, f.size, f.lastModified);
 }
 
 /** Guess "Artist - Title" from a filename. */
@@ -20,8 +32,9 @@ export function metaFromFilename(name: string): { title: string; artist: string 
  * Read ID3/Vorbis/MP4 tags + embedded artwork with music-metadata (lazy-loaded chunk).
  * Falls back to filename parsing.
  */
-export async function readTags(file: File): Promise<Partial<TrackMeta>> {
-  const guess = metaFromFilename(file.name);
+export async function readTags(file: Blob, fileName?: string): Promise<Partial<TrackMeta>> {
+  const name = fileName ?? (file as File).name ?? '';
+  const guess = metaFromFilename(name);
   try {
     const mm = await import('music-metadata');
     const md = await mm.parseBlob(file, { duration: true, skipCovers: false });

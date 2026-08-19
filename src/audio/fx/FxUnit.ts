@@ -94,6 +94,11 @@ export abstract class FxUnit {
     this.wetIn.gain.setTargetAtTime(this._enabled ? 1 : 0, t, 0.015);
   }
 
+  /** effective (clamped) value of a param, or undefined when the unit has no such param */
+  value(name: string): number | undefined {
+    return this.values.get(name);
+  }
+
   setParam(name: string, value: number) {
     const spec = this.params.find((p) => p.name === name);
     if (!spec) return;

@@ -59,6 +59,6 @@ export const useMixer = create<MixerState>()(
       setCueDeviceId: (cueDeviceId) => set({ cueDeviceId }),
       setSplitCue: (splitCue) => set({ splitCue }),
     }),
-    { name: 'djkado.mixer', partialize: (s) => ({ curve: s.curve, master: s.master, assign: s.assign, cueDeviceId: s.cueDeviceId, splitCue: s.splitCue, cueVolume: s.cueVolume }) },
+    { name: 'djkado.mixer', partialize: (s) => ({ curve: s.curve, master: s.master, assign: s.assign, cueDeviceId: s.cueDeviceId, splitCue: s.splitCue, cueVolume: s.cueVolume, cueMix: s.cueMix }) },
   ),
 );

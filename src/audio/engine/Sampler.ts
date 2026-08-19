@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { throttledStorage } from '@/store/throttledStorage';
+import { deleteStoredSample, getStoredSamples, putStoredSample } from '@/services/localLibrary/db';
 
 export type PadMode = 'oneshot' | 'hold' | 'loop';
 
@@ -28,20 +31,43 @@ interface SamplerStore {
   update: (id: string, p: Partial<PadState>) => void;
 }
 
-export const useSampler = create<SamplerStore>((set) => {
+const defaultPads = () => {
   const pads: Record<string, PadState> = {};
   for (let b = 0; b < BANKS; b++)
     for (let i = 0; i < PADS_PER_BANK; i++)
       pads[`${b}-${i}`] = { id: `${b}-${i}`, bank: b, index: i, name: `Pad ${i + 1}`, color: PAD_COLORS[i], mode: 'oneshot', gain: 1, hasSample: false, playing: false, durationSec: 0 };
-  return {
-    pads,
-    bank: 0,
-    volume: 0.9,
-    setBank: (bank) => set({ bank }),
-    setVolume: (volume) => set({ volume }),
-    update: (id, p) => set((s) => ({ pads: { ...s.pads, [id]: { ...s.pads[id], ...p } } })),
-  };
-});
+  return pads;
+};
+
+export const useSampler = create<SamplerStore>()(
+  persist(
+    (set) => ({
+      pads: defaultPads(),
+      bank: 0,
+      volume: 0.9,
+      setBank: (bank) => set({ bank }),
+      setVolume: (volume) => set({ volume }),
+      update: (id, p) => set((s) => ({ pads: { ...s.pads, [id]: { ...s.pads[id], ...p } } })),
+    }),
+    {
+      name: 'djkado.sampler',
+      storage: throttledStorage(),
+      // pad mode/gain/name/colour are user settings; hasSample/playing/durationSec follow the
+      // buffers that Sampler restores from IndexedDB, so they are rebuilt rather than trusted.
+      partialize: (s) => ({
+        volume: s.volume,
+        pads: Object.fromEntries(Object.entries(s.pads).map(([k, p]) => [k, { mode: p.mode, gain: p.gain, name: p.name, color: p.color }])),
+      }),
+      merge: (persisted, current) => {
+        const p = persisted as { volume?: number; pads?: Record<string, Partial<PadState>> } | undefined;
+        if (!p) return current;
+        const pads = { ...current.pads };
+        for (const [k, v] of Object.entries(p.pads ?? {})) if (pads[k]) pads[k] = { ...pads[k], ...v, hasSample: false, playing: false, durationSec: 0 };
+        return { ...current, pads, volume: p.volume ?? current.volume };
+      },
+    },
+  ),
+);
 
 /**
  * 2 banks × 8 pads sampler. Each pad holds an AudioBuffer; triggers spawn a
@@ -61,6 +87,8 @@ export class Sampler {
     this.unsub = useSampler.subscribe((s) => this.output.gain.setTargetAtTime(s.volume, ctx.currentTime, 0.02));
     // built-in demo samples (synthesized) so the sampler works out of the box
     this.generateBuiltins();
+    // …then overlay whatever the user loaded in an earlier session
+    void this.restore();
   }
 
   private padGain(id: string) {
@@ -82,6 +110,7 @@ export class Sampler {
     this.stop(id);
     this.buffers.delete(id);
     useSampler.getState().update(id, { hasSample: false, durationSec: 0, name: `Pad ${Number(id.split('-')[1]) + 1}` });
+    void deleteStoredSample(id); // …otherwise it would come back on the next launch
   }
 
   hasSample(id: string) {
@@ -146,8 +175,35 @@ export class Sampler {
   }
 
   async loadFile(id: string, file: File) {
-    const buf = await this.ctx.decodeAudioData(await file.arrayBuffer());
-    this.setSample(id, buf, file.name.replace(/\.[^.]+$/, ''));
+    const bytes = await file.arrayBuffer();
+    const name = file.name.replace(/\.[^.]+$/, '');
+    // decodeAudioData detaches the buffer, so keep a copy for the cache
+    const buf = await this.ctx.decodeAudioData(bytes.slice(0));
+    this.setSample(id, buf, name);
+    const pad = useSampler.getState().pads[id];
+    void putStoredSample({
+      id,
+      name,
+      blob: new Blob([bytes], { type: file.type || 'audio/*' }),
+      bank: pad?.bank ?? 0,
+      pad: pad?.index ?? 0,
+      mode: pad?.mode ?? 'oneshot',
+      color: pad?.color ?? '#f97316',
+    });
+  }
+
+  /** Re-load user samples saved in a previous session. */
+  private async restore() {
+    const rows = await getStoredSamples();
+    for (const row of rows) {
+      try {
+        const buf = await this.ctx.decodeAudioData(await row.blob.arrayBuffer());
+        this.setSample(row.id, buf, row.name);
+      } catch {
+        // unsupported/corrupt sample — drop it so it stops failing every launch
+        void deleteStoredSample(row.id);
+      }
+    }
   }
 
   /** Synthesized starter kit: kick, snare, clap, hat, air horn, riser, siren, vox-ish stab. */

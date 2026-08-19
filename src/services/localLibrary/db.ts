@@ -5,12 +5,17 @@ import type { TrackMeta } from '@/services/tracks/TrackRef';
 export interface StoredTrack {
   id: string; // trackKey
   meta: TrackMeta;
-  source: 'local' | 'demo';
+  source: 'local' | 'demo' | 'native';
   fileName: string;
   size: number;
   lastModified: number;
   handleId?: string; // reference into handles store when from FS Access dir
   relativePath?: string;
+  /** Android SAF document URI (source 'native') — readable while the grant is held */
+  uri?: string;
+  /** the SAF tree the document came from, so forgetting a folder can drop its rows */
+  folderUri?: string;
+  addedAt?: number;
 }
 
 export interface StoredCues {
@@ -108,9 +113,106 @@ export async function putCues(c: StoredCues) {
   }
 }
 
+/* ------------------------------ library rows ------------------------------ */
+
+/** Strip blob: artwork — those URLs die with the document and would render as broken images. */
+const persistableMeta = (m: TrackMeta): TrackMeta => (m.artworkUrl?.startsWith('blob:') ? { ...m, artworkUrl: undefined } : m);
+
+export async function putStoredTracks(rows: StoredTrack[]) {
+  if (!rows.length) return;
+  try {
+    const db = await getDb();
+    const tx = db.transaction('tracks', 'readwrite');
+    await Promise.all([...rows.map((r) => tx.store.put({ ...r, meta: persistableMeta(r.meta), addedAt: r.addedAt ?? Date.now() })), tx.done]);
+  } catch {
+    /* ignore — the library still works for this session */
+  }
+}
+
+export async function getStoredTrack(id: string): Promise<StoredTrack | undefined> {
+  try {
+    return await (await getDb()).get('tracks', id);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getStoredTracks(): Promise<StoredTrack[]> {
+  try {
+    return await (await getDb()).getAll('tracks');
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteStoredTracks(ids: string[]) {
+  if (!ids.length) return;
+  try {
+    const db = await getDb();
+    const tx = db.transaction('tracks', 'readwrite');
+    await Promise.all([...ids.map((id) => tx.store.delete(id)), tx.done]);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function clearStoredTracks() {
+  try {
+    await (await getDb()).clear('tracks');
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Track ids that still have stems cached (used to reconcile the persisted "stems ready" map). */
+export async function storedStemIds(): Promise<string[]> {
+  try {
+    return (await (await getDb()).getAllKeys('stems')) as string[];
+  } catch {
+    return [];
+  }
+}
+
+/* ------------------------------ sampler pads ------------------------------ */
+export interface StoredSample {
+  id: string;
+  name: string;
+  blob: Blob;
+  bank: number;
+  pad: number;
+  mode: string;
+  color: string;
+}
+
+export async function putStoredSample(rec: StoredSample) {
+  try {
+    await (await getDb()).put('samples', rec);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function getStoredSamples(): Promise<StoredSample[]> {
+  try {
+    return await (await getDb()).getAll('samples');
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteStoredSample(id: string) {
+  try {
+    await (await getDb()).delete('samples', id);
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function addHistory(entry: { trackId: string; meta: TrackMeta; deck: string }) {
   try {
-    await (await getDb()).add('history', { ...entry, playedAt: Date.now() });
+    // artwork is looked up from the library when History renders — never copy it per play
+    const meta = entry.meta.artworkUrl ? { ...entry.meta, artworkUrl: undefined } : entry.meta;
+    await (await getDb()).add('history', { ...entry, meta, playedAt: Date.now() });
   } catch {
     /* ignore */
   }
