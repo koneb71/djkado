@@ -122,6 +122,25 @@ Notes: local files come in through the system picker (Add files → Android docu
 
 ---
 
+## Deploy to a server (Docker / Dokploy)
+
+DJKado is a static web app plus a tiny API (Apple developer token + preview proxy) — no database, all user data stays in the browser. One container serves both:
+
+```bash
+docker build -t djkado .            # multi-stage: pnpm build → dist/, esbuild-bundled server → dist-server/
+docker run -p 8080:8080 djkado      # http://localhost:8080  ·  GET /api/health → {"ok":true}
+```
+
+Prebuilt images are published by CI to `ghcr.io/koneb71/djkado` (`:latest` = last release, `:edge` = main).
+
+**Dokploy** (either flavour):
+1. *Projects → Create Application*. **Provider: GitHub/Git** → repo `koneb71/djkado`, branch `main`, **Build type: Dockerfile** (path `Dockerfile`) — or **Provider: Docker** → image `ghcr.io/koneb71/djkado:latest`.
+2. *Environment*: nothing required. Optional: `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (paste the .p8 contents) for real Apple Music; Spotify is baked in at build time via build args `VITE_SPOTIFY_CLIENT_ID` / `VITE_SPOTIFY_REDIRECT_URI` (`https://your-domain/callback/spotify`, registered in the Spotify dashboard).
+3. *Domains*: add your domain, **container port `8080`**, HTTPS on (Let's Encrypt). A secure origin is required — AudioWorklet, WebGPU stems, `setSinkId` headphone routing and the File System Access API only work over HTTPS (or localhost).
+4. Deploy. Health check: `/api/health`. The image runs as a non-root user and needs no volumes.
+
+`docker-compose.yml` is included for compose-based hosting (Dokploy "Compose" service works too). Memory: the container is idle-cheap; heavy work (analysis, stem separation) happens in the visitor's browser.
+
 ## Keyboard (press `?` in the app)
 
 `Q/W` play A/B · `A/S` cue · `Z/X` sync · `1-4` / `7-0` hot cues · `E/O` loop · `R/T` `U/I` loop ½/×2 · `D/F` `J/K` bend · `C/V` censor · `G/H` slip · `↑/↓` browse · `Shift+←/→` load to A/B · `Enter` load to focused deck · `Space` play focused · `L` library · `N` 2/4 decks · `M` sampler · `F1–F8` sampler pads · `Shift+B` record · `Tab` cycle pad mode · `Shift+Q` add selected to queue · `Shift+A` Auto DJ on/off · `Shift+S` Auto DJ skip. Shift-drag knobs for fine control, double-click to reset, scroll the waveform to zoom.
@@ -160,7 +179,7 @@ Chrome / Edge give the full experience (AudioWorklet, File System Access, Web MI
 
 ## Scripts
 
-`pnpm dev` · `pnpm dev:web` · `pnpm dev:api` · `pnpm build` · `pnpm preview` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm dev:desktop` · `pnpm build:desktop` · `pnpm dist:mac` · `pnpm dist:win` · `pnpm dist` · `pnpm release` · `pnpm icons` (regenerate `build/icon.png`) · `node scripts/gen-demo.mjs` (regenerate demo clips) · `node scripts/vendor.mjs` (re-vendor the stretch lib after upgrading it)
+`pnpm dev` · `pnpm dev:web` · `pnpm dev:api` · `pnpm build` · `pnpm build:server` + `pnpm start` (production: static + API on :8787) · `pnpm preview` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm dev:desktop` · `pnpm build:desktop` · `pnpm dist:mac` · `pnpm dist:win` · `pnpm dist` · `pnpm release` · `pnpm icons` (regenerate `build/icon.png`) · `node scripts/gen-demo.mjs` (regenerate demo clips) · `node scripts/vendor.mjs` (re-vendor the stretch lib after upgrading it)
 
 ## Contributing & license
 

@@ -8,6 +8,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { compress } from 'hono/compress';
 import { appleConfigFromEnv, appleConfigured, mintDeveloperToken, type AppleConfig } from './appleToken.ts';
 
 export interface CreateAppOptions {
@@ -55,6 +56,13 @@ export function createApp(opts: CreateAppOptions = {}) {
 
   if (opts.staticDir) {
     const root = opts.staticDir;
+    // static assets: gzip text, long cache for hashed /assets, no-cache for the HTML shell
+    app.use('*', compress());
+    app.use('*', async (c, next) => {
+      await next();
+      if (c.req.path.startsWith('/assets/') || c.req.path.startsWith('/vendor/')) c.header('Cache-Control', 'public, max-age=31536000, immutable');
+      else if (c.res.headers.get('content-type')?.includes('text/html')) c.header('Cache-Control', 'no-cache');
+    });
     app.use('*', serveStatic({ root }));
     // SPA fallback (e.g. /callback/spotify)
     app.get('*', serveStatic({ root, path: 'index.html' }));

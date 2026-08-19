@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-electron
+dist-server
+release
+android
+.git
+.github
+*.p8
+.env
+.env.local
+coverage
+*.md
+!README.md
