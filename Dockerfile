@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # DJKado — production image: static web app + Hono API served by one Node process.
 # Build:  docker build -t djkado .
-# Run:    docker run -p 8080:8080 djkado
-# Dokploy: Application → build type "Dockerfile" → container port 8080 (see README ▸ Deploy).
+# Run:    docker run -p 51732:51732 djkado
+# Dokploy: Application → build type "Dockerfile" → container port 51732 (see README ▸ Deploy).
 
 # ---------- build ----------
 FROM node:22-bookworm-slim AS build
@@ -23,11 +23,11 @@ RUN pnpm exec vite build && pnpm build:server
 # ---------- runtime ----------
 FROM node:22-alpine AS runtime
 WORKDIR /app
-ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 STATIC_DIR=/app/dist
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=51732 STATIC_DIR=/app/dist
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
 RUN adduser -S -u 10001 djkado && chown -R djkado /app
 USER djkado
-EXPOSE 8080
+EXPOSE 51732
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist-server/index.mjs"]

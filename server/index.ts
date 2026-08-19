@@ -1,7 +1,7 @@
 /**
  * Standalone DJKado server.
  *   dev:        `node server/index.ts` (Node ≥ 22.6, native TS) — API only on 127.0.0.1:8787, Vite proxies /api
- *   production: STATIC_DIR=/app/dist HOST=0.0.0.0 PORT=8080 node dist-server/index.mjs — serves the built app + API
+ *   production: STATIC_DIR=/app/dist HOST=0.0.0.0 PORT=51732 node dist-server/index.mjs — serves the built app + API
  *               (see Dockerfile; Dokploy / any container host)
  * The Electron desktop app embeds the same Hono app (see server/app.ts) instead of running this.
  */

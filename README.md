@@ -128,7 +128,7 @@ DJKado is a static web app plus a tiny API (Apple developer token + preview prox
 
 ```bash
 docker build -t djkado .            # multi-stage: pnpm build → dist/, esbuild-bundled server → dist-server/
-docker run -p 8080:8080 djkado      # http://localhost:8080  ·  GET /api/health → {"ok":true}
+docker run -p 51732:51732 djkado    # http://localhost:51732  ·  GET /api/health → {"ok":true}
 ```
 
 Prebuilt images are published by CI to `ghcr.io/koneb71/djkado` (`:latest` = last release, `:edge` = main).
@@ -136,7 +136,7 @@ Prebuilt images are published by CI to `ghcr.io/koneb71/djkado` (`:latest` = las
 **Dokploy** (either flavour):
 1. *Projects → Create Application*. **Provider: GitHub/Git** → repo `koneb71/djkado`, branch `main`, **Build type: Dockerfile** (path `Dockerfile`) — or **Provider: Docker** → image `ghcr.io/koneb71/djkado:latest`.
 2. *Environment*: nothing required. Optional: `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (paste the .p8 contents) for real Apple Music; Spotify is baked in at build time via build args `VITE_SPOTIFY_CLIENT_ID` / `VITE_SPOTIFY_REDIRECT_URI` (`https://your-domain/callback/spotify`, registered in the Spotify dashboard).
-3. *Domains*: add your domain, **container port `8080`**, HTTPS on (Let's Encrypt). A secure origin is required — AudioWorklet, WebGPU stems, `setSinkId` headphone routing and the File System Access API only work over HTTPS (or localhost).
+3. *Domains*: add your domain, **container port `51732`**, HTTPS on (Let's Encrypt). A secure origin is required — AudioWorklet, WebGPU stems, `setSinkId` headphone routing and the File System Access API only work over HTTPS (or localhost).
 4. Deploy. Health check: `/api/health`. The image runs as a non-root user and needs no volumes.
 
 `docker-compose.yml` is included for compose-based hosting (Dokploy "Compose" service works too). Memory: the container is idle-cheap; heavy work (analysis, stem separation) happens in the visitor's browser.
