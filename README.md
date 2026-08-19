@@ -139,7 +139,7 @@ Prebuilt images are published by CI to `ghcr.io/koneb71/djkado` (`:latest` = las
 3. *Domains*: add your domain, **container port `51732`**, HTTPS on (Let's Encrypt). A secure origin is required — AudioWorklet, WebGPU stems, `setSinkId` headphone routing and the File System Access API only work over HTTPS (or localhost).
 4. Deploy. Health check: `/api/health`. The image runs as a non-root user and needs no volumes.
 
-**Dokploy as a Compose service:** point it at `docker-compose.dokploy.yml` (no host port, joined to `dokploy-network`), deploy, then add the domain in the service's *Domains* tab (service `djkado`, port `51732`, HTTPS + Let's Encrypt). If Traefik answers 404 / its default certificate, the container isn't running or isn't on `dokploy-network` — check the deploy log first. `docker-compose.yml` is the plain-Docker variant (publishes `${HOST_PORT:-51732}:51732`).
+**Dokploy as a Compose service:** point it at `docker-compose.dokploy.yml` (pulls `ghcr.io/koneb71/djkado:edge` — no build on the server, no host port, joined to `dokploy-network`; set `DJKADO_TAG=latest` for releases), deploy, then add the domain in the service's *Domains* tab (service `djkado`, port `51732`, HTTPS + Let's Encrypt). If Traefik answers 404 / its default certificate, the container isn't running or isn't on `dokploy-network` — check the deploy log first. `docker-compose.yml` is the plain-Docker variant (publishes `${HOST_PORT:-51732}:51732`).
 
 Memory: the container is idle-cheap; heavy work (analysis, stem separation) happens in the visitor's browser.
 

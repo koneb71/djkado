@@ -13,8 +13,8 @@ RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
 ARG VITE_SPOTIFY_CLIENT_ID=
 ARG VITE_SPOTIFY_REDIRECT_URI=
 ENV VITE_SPOTIFY_CLIENT_ID=$VITE_SPOTIFY_CLIENT_ID VITE_SPOTIFY_REDIRECT_URI=$VITE_SPOTIFY_REDIRECT_URI
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY scripts ./scripts
+# (pnpm-workspace.yaml only carries local build-approval settings — optional here)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 # esbuild/sharp/electron post-install scripts are only needed for desktop/icon work; skip them here
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
